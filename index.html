@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistem Data Karyawan</title>
+    <!-- Favicon Tab Browser -->
+    <link rel="icon" href="hoplun128.png" type="image/png">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- React & ReactDOM -->
@@ -32,18 +34,24 @@
         const IconPlus = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>;
         const IconX = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>;
 
-        // Firebase Setup (Dengan fallback jika dijalankan secara lokal tanpa config)
-        let auth, db, appId = 'local-app-id';
+        // Firebase Setup (Menggunakan konfigurasi hoplunjoin)
+        let auth, db, appId = 'hoplunjoin';
         try {
-            const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-            if (firebaseConfig) {
-                const app = initializeApp(firebaseConfig);
-                auth = getAuth(app);
-                db = getFirestore(app);
-                appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-            }
+            const firebaseConfig = {
+                apiKey: "AIzaSyCxdE9YjZM4ngMJNfhHF3W_iuDIepw2oyc",
+                authDomain: "hoplunjoin.firebaseapp.com",
+                projectId: "hoplunjoin",
+                storageBucket: "hoplunjoin.firebasestorage.app",
+                messagingSenderId: "755468078213",
+                appId: "1:755468078213:web:5b6bc52a532e2e05936dec",
+                measurementId: "G-39HESS6S4F"
+            };
+            
+            const app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+            db = getFirestore(app);
         } catch (e) {
-            console.warn("Firebase config tidak ditemukan, beralih ke Local Storage murni.");
+            console.warn("Firebase config error, beralih ke Local Storage murni.", e);
         }
 
         const defaultMonths = ['Mar-26', 'Apr-26', 'May-26', 'Jun-26'];
@@ -344,7 +352,11 @@
 
                     <div className="w-full max-w-[1400px]">
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                            <h1 className="text-2xl font-bold text-gray-800">Sistem Data Karyawan</h1>
+                            <div className="flex items-center gap-4">
+                                {/* Logo Perusahaan */}
+                                <img src="hoplun128.png" alt="Logo Hop Lun" className="h-10 w-auto object-contain" onError={(e) => { e.target.style.display = 'none'; }} />
+                                <h1 className="text-2xl font-bold text-gray-800">Sistem Data Karyawan</h1>
+                            </div>
                             <div className="flex flex-wrap gap-2">
                                 <button onClick={handleSaveData} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow">
                                     <IconSave /> Simpan

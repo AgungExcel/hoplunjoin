@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Data Karyawan</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- Babel untuk menerjemahkan JSX di browser -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="bg-gray-100">
+    <div id="root"></div>
+
+    <!-- Tipe script diatur ke text/babel agar browser memprosesnya menggunakan Babel -->
+    <script type="text/babel" data-type="module">
+        // Import Firebase secara dinamis dari CDN
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const { useState, useEffect, useMemo } = React;
+
+        // Ikon SVG (Pengganti Lucide React agar jalan di HTML murni)
+        const IconSave = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>;
+        const IconTrash = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>;
+        const IconDownload = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>;
+        const IconDatabase = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>;
+        const IconPlus = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>;
+        const IconX = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>;
+
+        // Firebase Setup (Dengan fallback jika dijalankan secara lokal tanpa config)
+        let auth, db, appId = 'local-app-id';
+        try {
+            const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+            if (firebaseConfig) {
+                const app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+                appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+            }
+        } catch (e) {
+            console.warn("Firebase config tidak ditemukan, beralih ke Local Storage murni.");
+        }
+
+        const defaultMonths = ['Mar-26', 'Apr-26', 'May-26', 'Jun-26'];
+        const defaultCategories = ['DIRECT SEWER', 'EXPERIENCE', 'VOCATIONAL SCHOOL GRADUATE'];
+        const defaultBudgets = {
+            'Mar-26': { 'DIRECT SEWER': 0, 'EXPERIENCE': 0, 'VOCATIONAL SCHOOL GRADUATE': 0 },
+            'Apr-26': { 'DIRECT SEWER': 0, 'EXPERIENCE': 80, 'VOCATIONAL SCHOOL GRADUATE': 120 },
+            'May-26': { 'DIRECT SEWER': 0, 'EXPERIENCE': 80, 'VOCATIONAL SCHOOL GRADUATE': 120 },
+            'Jun-26': { 'DIRECT SEWER': 0, 'EXPERIENCE': 80, 'VOCATIONAL SCHOOL GRADUATE': 120 }
+        };
+        const defaultActuals = {
+            'Mar-26': { 'DIRECT SEWER': 0, 'EXPERIENCE': 0, 'VOCATIONAL SCHOOL GRADUATE': 0 },
+            'Apr-26': { 'DIRECT SEWER': 70, 'EXPERIENCE': 85, 'VOCATIONAL SCHOOL GRADUATE': 100 },
+            'May-26': { 'DIRECT SEWER': 0, 'EXPERIENCE': 0, 'VOCATIONAL SCHOOL GRADUATE': 0 },
+            'Jun-26': { 'DIRECT SEWER': 0, 'EXPERIENCE': 0, 'VOCATIONAL SCHOOL GRADUATE': 0 }
+        };
+
+        function App() {
+            const [user, setUser] = useState(null);
+            const [months, setMonths] = useState(defaultMonths);
+            const [categories, setCategories] = useState(defaultCategories);
+            const [budgets, setBudgets] = useState(defaultBudgets);
+            const [actuals, setActuals] = useState(defaultActuals);
+            
+            const [selectedMonth, setSelectedMonth] = useState('Apr-26');
+            const [inputType, setInputType] = useState('actual');
+            const [newMonthStr, setNewMonthStr] = useState('');
+            const [newCategoryStr, setNewCategoryStr] = useState('');
+
+            const [messageModal, setMessageModal] = useState('');
+            const [confirmModal, setConfirmModal] = useState(null);
+            const [showDBModal, setShowDBModal] = useState(false);
+
+            // Inisialisasi Auth jika Firebase tersedia
+            useEffect(() => {
+                if (!auth) return;
+                const initAuth = async () => {
+                    try {
+                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                            await signInWithCustomToken(auth, __initial_auth_token);
+                        } else {
+                            await signInAnonymously(auth);
+                        }
+                    } catch (e) {
+                        console.warn("Autentikasi Firebase gagal:", e);
+                    }
+                };
+                initAuth();
+                const unsubscribe = onAuthStateChanged(auth, setUser);
+                return () => unsubscribe();
+            }, []);
+
+            // Muat Data (Prioritas: Firebase -> LocalStorage)
+            useEffect(() => {
+                if (user && db) {
+                    const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'karyawan_data', 'main_doc');
+                    const unsubscribe = onSnapshot(docRef, (snapshot) => {
+                        if (snapshot.exists()) {
+                            const data = snapshot.data();
+                            setMonths(data.months || defaultMonths);
+                            setCategories(data.categories || defaultCategories);
+                            setBudgets(data.budgets || defaultBudgets);
+                            setActuals(data.actuals || defaultActuals);
+                            if (data.months && data.months.length > 0 && !data.months.includes(selectedMonth)) {
+                                setSelectedMonth(data.months[0]);
+                            }
+                        }
+                    }, (error) => console.error(error));
+                    return () => unsubscribe();
+                } else {
+                    // Fallback Local Storage jika dibuka tanpa cloud
+                    const savedLocal = localStorage.getItem('karyawan_data_local');
+                    if (savedLocal) {
+                        const parsed = JSON.parse(savedLocal);
+                        setMonths(parsed.months || defaultMonths);
+                        setCategories(parsed.categories || defaultCategories);
+                        setBudgets(parsed.budgets || defaultBudgets);
+                        setActuals(parsed.actuals || defaultActuals);
+                    }
+                }
+            }, [user]);
+
+            // Kalkulasi
+            const calculatedData = useMemo(() => {
+                const calc = {};
+                const totals = {};
+                let carryover = {};
+
+                categories.forEach(cat => {
+                    totals[cat] = { b: 0, a: 0, bal: 0 };
+                    carryover[cat] = 0;
+                });
+
+                months.forEach(month => {
+                    calc[month] = {};
+                    categories.forEach(cat => {
+                        const budget = budgets[month]?.[cat] || 0;
+                        const inputActual = actuals[month]?.[cat] || 0;
+                        const effectiveInput = inputActual + carryover[cat];
+                        let actualRendered = effectiveInput;
+                        let balanceRendered = budget - actualRendered;
+                        let nextCarry = 0;
+
+                        if (balanceRendered < 0) {
+                            actualRendered = budget;
+                            nextCarry = Math.abs(balanceRendered);
+                            balanceRendered = 0;
+                        }
+
+                        calc[month][cat] = { budget, actual: actualRendered, balance: balanceRendered };
+                        carryover[cat] = nextCarry;
+
+                        totals[cat].b += budget;
+                        totals[cat].a += actualRendered;
+                        totals[cat].bal += balanceRendered;
+                    });
+                });
+
+                const monthlyTotals = {};
+                months.forEach(month => {
+                    let b = 0, a = 0, bal = 0;
+                    categories.forEach(cat => {
+                        b += calc[month][cat].budget;
+                        a += calc[month][cat].actual;
+                        bal += calc[month][cat].balance;
+                    });
+                    monthlyTotals[month] = { budget: b, actual: a, balance: bal };
+                });
+
+                let gb = 0, ga = 0, gbal = 0;
+                categories.forEach(cat => {
+                    gb += totals[cat].b; ga += totals[cat].a; gbal += totals[cat].bal;
+                });
+                const grandTotal = { budget: gb, actual: ga, balance: gbal };
+
+                return { calc, totals, monthlyTotals, grandTotal };
+            }, [months, categories, budgets, actuals]);
+
+            // Handlers
+            const handleInputChange = (field, value) => {
+                const numValue = value === '' ? '' : Number(value);
+                if (inputType === 'actual') {
+                    setActuals(prev => ({ ...prev, [selectedMonth]: { ...prev[selectedMonth], [field]: numValue } }));
+                } else {
+                    setBudgets(prev => ({ ...prev, [selectedMonth]: { ...prev[selectedMonth], [field]: numValue } }));
+                }
+            };
+
+            const handleAddMonth = () => {
+                if (!newMonthStr.trim() || months.includes(newMonthStr.trim())) return;
+                const newM = newMonthStr.trim();
+                setMonths(prev => [...prev, newM]);
+                setBudgets(prev => ({ ...prev, [newM]: {} }));
+                setActuals(prev => ({ ...prev, [newM]: {} }));
+                setNewMonthStr('');
+                setSelectedMonth(newM);
+            };
+
+            const handleDeleteMonth = (monthToDelete) => {
+                if (months.length <= 1) {
+                    setMessageModal('Gagal: Minimal harus ada 1 bulan tersisa!');
+                    return;
+                }
+                setConfirmModal({
+                    message: `Yakin ingin menghapus bulan ${monthToDelete}?`,
+                    onConfirm: () => {
+                        const newMonths = months.filter(m => m !== monthToDelete);
+                        setMonths(newMonths);
+                        if (selectedMonth === monthToDelete) setSelectedMonth(newMonths[0]);
+                    }
+                });
+            };
+
+            const handleAddCategory = () => {
+                const newCat = newCategoryStr.trim().toUpperCase();
+                if (!newCat || categories.includes(newCat)) return;
+                setCategories(prev => [...prev, newCat]);
+                setNewCategoryStr('');
+            };
+
+            const handleDeleteCategory = (catToDelete) => {
+                if (categories.length <= 1) {
+                    setMessageModal('Gagal: Minimal harus ada 1 kategori baris tersisa!');
+                    return;
+                }
+                setConfirmModal({
+                    message: `Yakin ingin menghapus kategori ${catToDelete}?`,
+                    onConfirm: () => {
+                        setCategories(categories.filter(c => c !== catToDelete));
+                    }
+                });
+            };
+
+            const handleSaveData = async () => {
+                // Selalu simpan ke local storage sebagai backup
+                localStorage.setItem('karyawan_data_local', JSON.stringify({ months, categories, budgets, actuals }));
+                
+                if (user && db) {
+                    try {
+                        const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'karyawan_data', 'main_doc');
+                        await setDoc(docRef, { months, categories, budgets, actuals });
+                        setMessageModal('Data berhasil disimpan ke Cloud & Lokal!');
+                    } catch (error) {
+                        setMessageModal('Disimpan ke Lokal (Gagal koneksi Cloud).');
+                    }
+                } else {
+                    setMessageModal('Data berhasil disimpan di browser (Lokal)!');
+                }
+            };
+
+            const handleClearData = () => {
+                setConfirmModal({
+                    message: 'Reset semua ke pengaturan awal?',
+                    onConfirm: async () => {
+                        setMonths(defaultMonths);
+                        setCategories(defaultCategories);
+                        setBudgets(defaultBudgets);
+                        setActuals(defaultActuals);
+                        setSelectedMonth(defaultMonths[0]);
+                        localStorage.removeItem('karyawan_data_local');
+                        
+                        if (user && db) {
+                            try {
+                                const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'karyawan_data', 'main_doc');
+                                await setDoc(docRef, { months: defaultMonths, categories: defaultCategories, budgets: defaultBudgets, actuals: defaultActuals });
+                            } catch (error) {
+                                console.error(error);
+                            }
+                        }
+                    }
+                });
+            };
+
+            const generateHTMLString = () => {
+                const table = document.getElementById('dataTable').outerHTML;
+                return `
+                    <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+                    <head>
+                        <meta charset="utf-8" />
+                        <style>
+                            table { border-collapse: collapse; font-family: sans-serif; font-size: 14px; }
+                            th, td { border: 1px solid black; padding: 6px; }
+                        </style>
+                    </head>
+                    <body>${table}</body>
+                    </html>
+                `;
+            };
+
+            const handleExportExcelWithStyle = () => {
+                const html = generateHTMLString();
+                const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'Data_Karyawan.xls';
+                a.click();
+                URL.revokeObjectURL(url);
+            };
+
+            return (
+                <div className="min-h-screen p-8 font-sans text-sm text-black flex flex-col items-center relative">
+                    {/* MODALS */}
+                    {messageModal && (
+                        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50 px-4">
+                            <div className="bg-white p-6 rounded-lg shadow-xl flex flex-col items-center max-w-sm text-center">
+                                <p className="mb-6 font-medium text-gray-800">{messageModal}</p>
+                                <button onClick={() => setMessageModal('')} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded shadow transition-colors">Mengerti</button>
+                            </div>
+                        </div>
+                    )}
+
+                    {confirmModal && (
+                        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50 px-4">
+                            <div className="bg-white p-6 rounded-lg shadow-xl flex flex-col items-center max-w-sm text-center">
+                                <p className="mb-6 font-medium text-gray-800">{confirmModal.message}</p>
+                                <div className="flex gap-4">
+                                    <button onClick={() => { confirmModal.onConfirm(); setConfirmModal(null); }} className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded shadow">Ya, Lanjutkan</button>
+                                    <button onClick={() => setConfirmModal(null)} className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-6 py-2 rounded shadow">Batal</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {showDBModal && (
+                        <div className="fixed inset-0 flex items-center justify-center bg-black/60 z-50 px-4">
+                            <div className="bg-white p-6 rounded-lg shadow-xl flex flex-col w-full max-w-3xl max-h-[85vh]">
+                                <div className="flex justify-between items-center mb-4 border-b pb-2">
+                                    <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">Data Tersimpan</h2>
+                                    <button onClick={() => setShowDBModal(false)} className="text-red-500 font-bold">X Tutup</button>
+                                </div>
+                                <pre className="bg-gray-900 text-green-400 p-4 rounded overflow-auto text-xs text-left h-full">
+                                    {JSON.stringify({ months, categories, budgets, actuals }, null, 2)}
+                                </pre>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="w-full max-w-[1400px]">
+                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                            <h1 className="text-2xl font-bold text-gray-800">Sistem Data Karyawan</h1>
+                            <div className="flex flex-wrap gap-2">
+                                <button onClick={handleSaveData} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow">
+                                    <IconSave /> Simpan
+                                </button>
+                                <button onClick={() => setShowDBModal(true)} className="flex items-center gap-2 bg-gray-700 hover:bg-gray-800 text-white px-4 py-2 rounded shadow">
+                                    <IconDatabase /> Lihat Data
+                                </button>
+                                <button onClick={handleClearData} className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded shadow">
+                                    <IconTrash /> Reset
+                                </button>
+                                <button onClick={handleExportExcelWithStyle} className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow">
+                                    <IconDownload /> Export Excel
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* PANEL KONTROL */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                            <table className="border-collapse border border-black w-full bg-white shadow-sm">
+                                <tbody>
+                                    <tr>
+                                        <td colSpan="2" style={{backgroundColor: '#ffff00'}} className="border border-black px-3 py-1.5 font-bold text-center">INPUT DATA</td>
+                                    </tr>
+                                    <tr>
+                                        <td style={{backgroundColor: '#ffff00'}} className="border border-black px-3 py-1.5 font-medium w-1/3">Bulan</td>
+                                        <td className="border border-black bg-white px-3 py-1.5 flex justify-between items-center">
+                                            <select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className="w-full outline-none font-medium bg-transparent">
+                                                {months.map(m => <option key={m} value={m}>{m}</option>)}
+                                            </select>
+                                            {months.length > 1 && (
+                                                <button onClick={() => handleDeleteMonth(selectedMonth)} className="text-red-500 hover:text-red-700 ml-2"><IconX /></button>
+                                            )}
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td style={{backgroundColor: '#ffff00'}} className="border border-black px-3 py-1.5 font-medium">Mode Input</td>
+                                        <td className="border border-black bg-white px-3 py-1.5">
+                                            <select value={inputType} onChange={(e) => setInputType(e.target.value)} className="w-full outline-none font-bold text-blue-700 bg-transparent">
+                                                <option value="actual">Input Aktual</option>
+                                                <option value="budget">Set Budget/Target</option>
+                                            </select>
+                                        </td>
+                                    </tr>
+                                    {categories.map((cat, idx) => (
+                                        <tr key={cat}>
+                                            <td style={{backgroundColor: idx === 0 ? '#ffc0cb' : '#ffff00'}} className="border border-black px-3 py-1.5 font-medium text-xs leading-tight">
+                                                <div className="flex justify-between items-center">
+                                                    <span>{cat}</span>
+                                                    <button onClick={() => handleDeleteCategory(cat)} className="text-red-500 hover:text-red-800 ml-2"><IconX /></button>
+                                                </div>
+                                            </td>
+                                            <td className="border border-black bg-white px-3 py-1.5">
+                                                <input type="number" value={inputType === 'actual' ? (actuals[selectedMonth]?.[cat] ?? '') : (budgets[selectedMonth]?.[cat] ?? '')} onChange={(e) => handleInputChange(cat, e.target.value)} className="w-full text-right outline-none bg-transparent" placeholder="0" />
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+
+                            <div className="bg-white p-5 border border-gray-300 rounded shadow-sm flex flex-col justify-center">
+                                <h3 className="font-bold text-gray-700 mb-2 border-b pb-2">Tambah Kategori Baru</h3>
+                                <input type="text" value={newCategoryStr} onChange={(e) => setNewCategoryStr(e.target.value)} className="border border-gray-300 p-2 rounded mb-3 outline-none uppercase" placeholder="Contoh: STAFF IT..." />
+                                <button onClick={handleAddCategory} className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white py-2 rounded"><IconPlus /> Tambah Baris</button>
+                            </div>
+
+                            <div className="bg-white p-5 border border-gray-300 rounded shadow-sm flex flex-col justify-center">
+                                <h3 className="font-bold text-gray-700 mb-2 border-b pb-2">Tambah Bulan Baru</h3>
+                                <input type="text" value={newMonthStr} onChange={(e) => setNewMonthStr(e.target.value)} className="border border-gray-300 p-2 rounded mb-3 outline-none" placeholder="Masukkan teks..." />
+                                <button onClick={handleAddMonth} className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded"><IconPlus /> Tambah Kolom</button>
+                            </div>
+                        </div>
+
+                        {/* TABEL OUTPUT */}
+                        <div className="overflow-x-auto w-full pb-8 bg-white p-2 shadow-sm border border-gray-200">
+                            <table id="dataTable" className="border-collapse w-full min-w-max text-center" border="1">
+                                <thead>
+                                    <tr style={{backgroundColor: '#ffc0cb'}}>
+                                        <th className="border border-black px-2 py-2 font-bold" rowSpan="2">NO.</th>
+                                        <th className="border border-black px-2 py-2 font-bold w-[220px]" rowSpan="2">EMPLOYEE CATEGORIES</th>
+                                        <th className="border border-black px-2 py-2 font-bold w-[120px]" rowSpan="2">DETAIL</th>
+                                        {months.map(m => (
+                                            <th key={m} colSpan="3" style={{backgroundColor: '#ffc0cb'}} className="border border-black px-2 py-1 font-bold relative group">
+                                                {m}
+                                                {months.length > 1 && (
+                                                    <button onClick={() => handleDeleteMonth(m)} className="absolute top-1 right-1 text-red-600 hidden group-hover:block"><IconX /></button>
+                                                )}
+                                            </th>
+                                        ))}
+                                        <th colSpan="3" style={{backgroundColor: '#e5e7eb'}} className="border border-black px-2 py-1 font-bold">TOTAL ALL</th>
+                                    </tr>
+                                    <tr>
+                                        {months.map(m => (
+                                            <React.Fragment key={`sub-${m}`}>
+                                                <th style={{backgroundColor: '#ffffff'}} className="border border-black font-normal py-1 px-2 min-w-[60px]">Budget</th>
+                                                <th style={{backgroundColor: '#ffffff'}} className="border border-black font-normal py-1 px-2 min-w-[60px]">Actual</th>
+                                                <th style={{backgroundColor: '#ffffff'}} className="border border-black font-normal py-1 px-2 min-w-[60px]">Balance</th>
+                                            </React.Fragment>
+                                        ))}
+                                        <th style={{backgroundColor: '#f3f4f6'}} className="border border-black font-bold py-1 px-2 min-w-[70px]">Budget</th>
+                                        <th style={{backgroundColor: '#f3f4f6'}} className="border border-black font-bold py-1 px-2 min-w-[70px]">Actual</th>
+                                        <th style={{backgroundColor: '#f3f4f6'}} className="border border-black font-bold py-1 px-2 min-w-[70px]">Balance</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {categories.map((cat, idx) => {
+                                        const isFirst = idx === 0;
+                                        const bgColorKiri = isFirst ? '#ffc0cb' : '#ffff00';
+                                        return (
+                                            <tr key={cat}>
+                                                {isFirst && <td rowSpan={categories.length} style={{backgroundColor: '#ffc0cb'}} className="border border-black align-middle font-bold">1</td>}
+                                                <td style={{backgroundColor: bgColorKiri}} className="border border-black text-left px-3 font-medium text-xs leading-tight">{cat}</td>
+                                                {isFirst && <td style={{backgroundColor: '#ffffff'}} className="border border-black">Requirement</td>}
+                                                {idx === 1 && <td rowSpan={categories.length - 1} style={{backgroundColor: '#ffff00'}} className="border border-black align-middle">Target</td>}
+                                                {months.map(m => (
+                                                    <React.Fragment key={`${cat}-${m}`}>
+                                                        <td style={{backgroundColor: bgColorKiri}} className="border border-black text-right px-2">{calculatedData.calc[m][cat].budget}</td>
+                                                        <td style={{backgroundColor: '#ffff00'}} className="border border-black text-right px-2">{calculatedData.calc[m][cat].actual}</td>
+                                                        <td style={{backgroundColor: '#ffffff'}} className="border border-black text-right px-2">{calculatedData.calc[m][cat].balance}</td>
+                                                    </React.Fragment>
+                                                ))}
+                                                <td style={{backgroundColor: '#f3f4f6'}} className="border border-black text-right px-2 font-bold">{calculatedData.totals[cat].b}</td>
+                                                <td style={{backgroundColor: '#f3f4f6'}} className="border border-black text-right px-2 font-bold">{calculatedData.totals[cat].a}</td>
+                                                <td style={{backgroundColor: '#f3f4f6'}} className="border border-black text-right px-2 font-bold">{calculatedData.totals[cat].bal}</td>
+                                            </tr>
+                                        );
+                                    })}
+                                    <tr style={{backgroundColor: '#ffc0cb'}} className="font-bold">
+                                        <td colSpan="3" style={{backgroundColor: '#ffc0cb'}} className="border border-black text-left px-4 tracking-wider">TOTAL</td>
+                                        {months.map(m => (
+                                            <React.Fragment key={`total-${m}`}>
+                                                <td style={{backgroundColor: '#ffc0cb'}} className="border border-black text-right px-2">{calculatedData.monthlyTotals[m].budget}</td>
+                                                <td style={{backgroundColor: '#ffc0cb'}} className="border border-black text-right px-2">{calculatedData.monthlyTotals[m].actual}</td>
+                                                <td style={{backgroundColor: '#ffc0cb'}} className="border border-black text-right px-2">{calculatedData.monthlyTotals[m].balance}</td>
+                                            </React.Fragment>
+                                        ))}
+                                        <td style={{backgroundColor: '#e5e7eb'}} className="border border-black text-right px-2">{calculatedData.grandTotal.budget}</td>
+                                        <td style={{backgroundColor: '#e5e7eb'}} className="border border-black text-right px-2">{calculatedData.grandTotal.actual}</td>
+                                        <td style={{backgroundColor: '#e5e7eb'}} className="border border-black text-right px-2">{calculatedData.grandTotal.balance}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

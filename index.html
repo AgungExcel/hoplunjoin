@@ -6,8 +6,22 @@
     <title>Sistem Data Karyawan</title>
     <!-- Favicon Tab Browser -->
     <link rel="icon" href="hoplun128.png" type="image/png">
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tailwind Config untuk Font Custom -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] }
+                }
+            }
+        }
+    </script>
     <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -16,14 +30,14 @@
     <!-- Supabase JS Client -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
-<body class="bg-gray-100">
+<body class="bg-slate-50 text-slate-800 antialiased selection:bg-indigo-100 selection:text-indigo-900">
     <div id="root"></div>
 
     <script type="text/babel" data-type="module">
         const { useState, useEffect, useMemo, useRef } = React;
         const { createClient } = supabase;
 
-        // Ikon SVG
+        // Ikon SVG Modern
         const IconTrash = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>;
         const IconDownload = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>;
         const IconPlus = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>;
@@ -49,6 +63,45 @@
             'Jun-26': { 'DIRECT SEWER': 0, 'EXPERIENCE': 0, 'VOCATIONAL SCHOOL GRADUATE': 0 }
         };
 
+        // --- Palet Warna Inline (untuk export Excel) ---
+        const colors = {
+            headerBg: '#1e293b',     // Slate-800
+            headerText: '#ffffff',   // White
+            totalAllBg: '#4f46e5',   // Indigo-600
+            totalAllText: '#ffffff', // White
+            subHeaderBg: '#f1f5f9',  // Slate-100
+            subHeaderText: '#334155',// Slate-700
+            rowEven: '#ffffff',      // White
+            rowOdd: '#f8fafc',       // Slate-50
+            totalRowBg: '#e0e7ff',   // Indigo-100
+            totalRowText: '#3730a3', // Indigo-800
+            border: '#cbd5e1',       // Slate-300
+            textNormal: '#1e293b',   // Slate-800
+            textRed: '#dc2626',      // Red-600
+            textGreen: '#16a34a'     // Green-600
+        };
+
+        // Helper untuk mewarnai angka secara kondisional
+        const getNumberStyle = (actual, budget, isBalance = false) => {
+            const balance = budget - actual;
+            let color = colors.textNormal;
+            let fontWeight = 'normal';
+
+            if (budget > 0) {
+                if (balance > 0) {
+                    // Actual < Budget (Ada kekurangan / defisit)
+                    color = colors.textRed;
+                    fontWeight = 'bold';
+                } else if (balance === 0) {
+                    // Actual == Budget (Target terpenuhi pas)
+                    color = colors.textGreen;
+                    fontWeight = 'bold';
+                }
+            }
+            
+            return { color, fontWeight };
+        };
+
         function App() {
             const [months, setMonths] = useState(defaultMonths);
             const [categories, setCategories] = useState(defaultCategories);
@@ -63,19 +116,12 @@
             const [messageModal, setMessageModal] = useState('');
             const [confirmModal, setConfirmModal] = useState(null);
             
-            // Status sinkronisasi real-time
             const [syncStatus, setSyncStatus] = useState('connecting'); 
             const isLocalChange = useRef(false);
 
-            // Fetch Awal & Subscribe ke Supabase Realtime
             useEffect(() => {
                 const fetchAndSubscribe = async () => {
-                    // 1. Fetch data awal saat web dibuka
-                    const { data, error } = await supabaseClient
-                        .from('karyawan_data')
-                        .select('*')
-                        .eq('id', 'main_doc')
-                        .single();
+                    const { data, error } = await supabaseClient.from('karyawan_data').select('*').eq('id', 'main_doc').single();
 
                     if (data) {
                         isLocalChange.current = false;
@@ -83,102 +129,56 @@
                         setCategories(data.categories || defaultCategories);
                         setBudgets(data.budgets || defaultBudgets);
                         setActuals(data.actuals || defaultActuals);
-                        if (data.months && data.months.length > 0 && !data.months.includes(selectedMonth)) {
-                            setSelectedMonth(data.months[0]);
-                        }
+                        if (data.months && data.months.length > 0 && !data.months.includes(selectedMonth)) setSelectedMonth(data.months[0]);
                         setSyncStatus('synced');
                     } else {
-                        if (error) {
-                            if (error.code === 'PGRST116') {
-                                // Data belum ada, pakai default (normal)
-                                setSyncStatus('synced');
-                            } else if (error.code === 'PGRST205') {
-                                // Tabel tidak ditemukan di Supabase
-                                // Mengubah dari console.error ke console.warn agar tidak memblokir aplikasi dengan overlay error
-                                console.warn("Tabel belum dibuat di Supabase. Menunggu pembuatan tabel...");
-                                setSyncStatus('error');
-                                setMessageModal('PENTING: Tabel "karyawan_data" belum ada di Supabase. Anda harus membuat tabel terlebih dahulu di Dashboard Supabase Anda.');
-                            } else {
-                                console.error("Fetch error:", error);
-                                setSyncStatus('error');
-                            }
-                        }
+                        if (error && error.code === 'PGRST116') setSyncStatus('synced');
+                        else if (error && error.code === 'PGRST205') {
+                            console.warn("Tabel belum dibuat di Supabase.");
+                            setSyncStatus('error');
+                            setMessageModal('PENTING: Tabel "karyawan_data" belum ada di Supabase. Anda harus membuat tabel terlebih dahulu di Dashboard Supabase Anda.');
+                        } else setSyncStatus('error');
                     }
 
-                    // 2. Subscribe (Listen) perubahan dari database secara Realtime
-                    const channel = supabaseClient
-                        .channel('schema-db-changes')
-                        .on(
-                            'postgres_changes',
-                            { event: '*', schema: 'public', table: 'karyawan_data', filter: 'id=eq.main_doc' },
-                            (payload) => {
-                                const newData = payload.new;
-                                if (newData) {
-                                    isLocalChange.current = false; // Mencegah loop
-                                    setMonths(newData.months || defaultMonths);
-                                    setCategories(newData.categories || defaultCategories);
-                                    setBudgets(newData.budgets || defaultBudgets);
-                                    setActuals(newData.actuals || defaultActuals);
-                                }
+                    const channel = supabaseClient.channel('schema-db-changes').on(
+                        'postgres_changes', { event: '*', schema: 'public', table: 'karyawan_data', filter: 'id=eq.main_doc' },
+                        (payload) => {
+                            if (payload.new) {
+                                isLocalChange.current = false;
+                                setMonths(payload.new.months || defaultMonths);
+                                setCategories(payload.new.categories || defaultCategories);
+                                setBudgets(payload.new.budgets || defaultBudgets);
+                                setActuals(payload.new.actuals || defaultActuals);
                             }
-                        )
-                        .subscribe();
+                        }
+                    ).subscribe();
 
-                    return () => {
-                        supabaseClient.removeChannel(channel);
-                    };
+                    return () => supabaseClient.removeChannel(channel);
                 };
-
                 fetchAndSubscribe();
             }, []);
 
-            // Auto-Save Effect (Realtime debounce) ke Supabase
             useEffect(() => {
                 if (!isLocalChange.current) return;
-
                 setSyncStatus('saving');
                 const timeoutId = setTimeout(async () => {
                     localStorage.setItem('karyawan_data_local', JSON.stringify({ months, categories, budgets, actuals }));
-                    
                     try {
-                        // Upsert = Update atau Insert jika belum ada
-                        const { error } = await supabaseClient
-                            .from('karyawan_data')
-                            .upsert({ 
-                                id: 'main_doc', 
-                                months, 
-                                categories, 
-                                budgets, 
-                                actuals 
-                            });
-
+                        const { error } = await supabaseClient.from('karyawan_data').upsert({ id: 'main_doc', months, categories, budgets, actuals });
                         if (error) throw error;
                         setSyncStatus('synced');
                         isLocalChange.current = false;
                     } catch (error) {
-                        if (error.code === 'PGRST205') {
-                            console.warn('Gagal menyimpan: Tabel belum ada di Supabase.');
-                            isLocalChange.current = false; // Stop mencoba simpan jika tabel tidak ada
-                        } else {
-                            console.error('Save error:', error);
-                        }
+                        if (error.code === 'PGRST205') isLocalChange.current = false;
                         setSyncStatus('error');
                     }
-                }, 800); // 0.8 detik debounce setelah mengetik
-
+                }, 800);
                 return () => clearTimeout(timeoutId);
             }, [months, categories, budgets, actuals]);
 
-            // Kalkulasi
             const calculatedData = useMemo(() => {
-                const calc = {};
-                const totals = {};
-                let carryover = {};
-
-                categories.forEach(cat => {
-                    totals[cat] = { b: 0, a: 0, bal: 0 };
-                    carryover[cat] = 0;
-                });
+                const calc = {}; const totals = {}; let carryover = {};
+                categories.forEach(cat => { totals[cat] = { b: 0, a: 0, bal: 0 }; carryover[cat] = 0; });
 
                 months.forEach(month => {
                     calc[month] = {};
@@ -199,61 +199,43 @@
                         calc[month][cat] = { budget, actual: actualRendered, balance: balanceRendered };
                         carryover[cat] = nextCarry;
 
-                        totals[cat].b += budget;
-                        totals[cat].a += actualRendered;
-                        totals[cat].bal += balanceRendered;
+                        totals[cat].b += budget; totals[cat].a += actualRendered; totals[cat].bal += balanceRendered;
                     });
                 });
 
                 const monthlyTotals = {};
                 months.forEach(month => {
                     let b = 0, a = 0, bal = 0;
-                    categories.forEach(cat => {
-                        b += calc[month][cat].budget;
-                        a += calc[month][cat].actual;
-                        bal += calc[month][cat].balance;
-                    });
+                    categories.forEach(cat => { b += calc[month][cat].budget; a += calc[month][cat].actual; bal += calc[month][cat].balance; });
                     monthlyTotals[month] = { budget: b, actual: a, balance: bal };
                 });
 
                 let gb = 0, ga = 0, gbal = 0;
-                categories.forEach(cat => {
-                    gb += totals[cat].b; ga += totals[cat].a; gbal += totals[cat].bal;
-                });
+                categories.forEach(cat => { gb += totals[cat].b; ga += totals[cat].a; gbal += totals[cat].bal; });
                 const grandTotal = { budget: gb, actual: ga, balance: gbal };
 
                 return { calc, totals, monthlyTotals, grandTotal };
             }, [months, categories, budgets, actuals]);
 
-            // Handlers
             const handleInputChange = (field, value) => {
                 isLocalChange.current = true;
                 const numValue = value === '' ? '' : Number(value);
-                if (inputType === 'actual') {
-                    setActuals(prev => ({ ...prev, [selectedMonth]: { ...prev[selectedMonth], [field]: numValue } }));
-                } else {
-                    setBudgets(prev => ({ ...prev, [selectedMonth]: { ...prev[selectedMonth], [field]: numValue } }));
-                }
+                if (inputType === 'actual') setActuals(prev => ({ ...prev, [selectedMonth]: { ...prev[selectedMonth], [field]: numValue } }));
+                else setBudgets(prev => ({ ...prev, [selectedMonth]: { ...prev[selectedMonth], [field]: numValue } }));
             };
 
             const handleAddMonth = () => {
                 if (!newMonthStr.trim() || months.includes(newMonthStr.trim())) return;
                 isLocalChange.current = true;
                 const newM = newMonthStr.trim();
-                setMonths(prev => [...prev, newM]);
-                setBudgets(prev => ({ ...prev, [newM]: {} }));
-                setActuals(prev => ({ ...prev, [newM]: {} }));
-                setNewMonthStr('');
-                setSelectedMonth(newM);
+                setMonths(prev => [...prev, newM]); setBudgets(prev => ({ ...prev, [newM]: {} })); setActuals(prev => ({ ...prev, [newM]: {} }));
+                setNewMonthStr(''); setSelectedMonth(newM);
             };
 
             const handleDeleteMonth = (monthToDelete) => {
-                if (months.length <= 1) {
-                    setMessageModal('Gagal: Minimal harus ada 1 bulan tersisa!');
-                    return;
-                }
+                if (months.length <= 1) { setMessageModal('Gagal: Minimal harus ada 1 bulan tersisa!'); return; }
                 setConfirmModal({
-                    message: `Yakin ingin menghapus bulan ${monthToDelete}?`,
+                    message: `Yakin ingin menghapus kolom bulan ${monthToDelete}?`,
                     onConfirm: () => {
                         isLocalChange.current = true;
                         const newMonths = months.filter(m => m !== monthToDelete);
@@ -267,34 +249,23 @@
                 const newCat = newCategoryStr.trim().toUpperCase();
                 if (!newCat || categories.includes(newCat)) return;
                 isLocalChange.current = true;
-                setCategories(prev => [...prev, newCat]);
-                setNewCategoryStr('');
+                setCategories(prev => [...prev, newCat]); setNewCategoryStr('');
             };
 
             const handleDeleteCategory = (catToDelete) => {
-                if (categories.length <= 1) {
-                    setMessageModal('Gagal: Minimal harus ada 1 kategori baris tersisa!');
-                    return;
-                }
+                if (categories.length <= 1) { setMessageModal('Gagal: Minimal harus ada 1 kategori baris tersisa!'); return; }
                 setConfirmModal({
-                    message: `Yakin ingin menghapus kategori ${catToDelete}?`,
-                    onConfirm: () => {
-                        isLocalChange.current = true;
-                        setCategories(categories.filter(c => c !== catToDelete));
-                    }
+                    message: `Yakin ingin menghapus baris kategori ${catToDelete}?`,
+                    onConfirm: () => { isLocalChange.current = true; setCategories(categories.filter(c => c !== catToDelete)); }
                 });
             };
 
             const handleClearData = () => {
                 setConfirmModal({
-                    message: 'Reset semua ke pengaturan awal?',
-                    onConfirm: async () => {
+                    message: 'Reset semua data kembali ke pengaturan awal?',
+                    onConfirm: () => {
                         isLocalChange.current = true;
-                        setMonths(defaultMonths);
-                        setCategories(defaultCategories);
-                        setBudgets(defaultBudgets);
-                        setActuals(defaultActuals);
-                        setSelectedMonth(defaultMonths[0]);
+                        setMonths(defaultMonths); setCategories(defaultCategories); setBudgets(defaultBudgets); setActuals(defaultActuals); setSelectedMonth(defaultMonths[0]);
                     }
                 });
             };
@@ -306,8 +277,8 @@
                     <head>
                         <meta charset="utf-8" />
                         <style>
-                            table { border-collapse: collapse; font-family: sans-serif; font-size: 14px; }
-                            th, td { border: 1px solid black; padding: 6px; }
+                            table { border-collapse: collapse; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 13px; }
+                            th, td { border: 1px solid ${colors.border}; padding: 8px; }
                         </style>
                     </head>
                     <body>${table}</body>
@@ -319,187 +290,231 @@
                 const html = generateHTMLString();
                 const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
                 const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'Data_Karyawan.xls';
-                a.click();
-                URL.revokeObjectURL(url);
+                const a = document.createElement('a'); a.href = url; a.download = 'Data_Karyawan_Modern.xls'; a.click(); URL.revokeObjectURL(url);
             };
 
+            const cellStyle = { border: `1px solid ${colors.border}`, padding: '0.5rem 0.75rem' };
+            const headerStyle = { ...cellStyle, backgroundColor: colors.headerBg, color: colors.headerText, fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.75rem' };
+            const totalAllHeaderStyle = { ...headerStyle, backgroundColor: colors.totalAllBg };
+            const subHeaderStyle = { ...cellStyle, backgroundColor: colors.subHeaderBg, color: colors.subHeaderText, fontWeight: '600', fontSize: '0.8rem' };
+
             return (
-                <div className="min-h-screen p-8 font-sans text-sm text-black flex flex-col items-center relative">
+                <div className="min-h-screen p-6 md:p-10 text-slate-800 flex flex-col items-center relative">
                     {/* MODALS */}
                     {messageModal && (
-                        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50 px-4">
-                            <div className="bg-white p-6 rounded-lg shadow-xl flex flex-col items-center max-w-sm text-center">
-                                <p className="mb-6 font-medium text-gray-800">{messageModal}</p>
-                                <button onClick={() => setMessageModal('')} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded shadow transition-colors">Mengerti</button>
+                        <div className="fixed inset-0 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm z-50 px-4 transition-all">
+                            <div className="bg-white p-8 rounded-2xl shadow-2xl flex flex-col items-center max-w-sm text-center transform scale-100">
+                                <div className="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center mb-4"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></div>
+                                <p className="mb-6 font-medium text-slate-700">{messageModal}</p>
+                                <button onClick={() => setMessageModal('')} className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-8 py-2.5 rounded-xl shadow-md transition-all active:scale-95">Mengerti</button>
                             </div>
                         </div>
                     )}
 
                     {confirmModal && (
-                        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50 px-4">
-                            <div className="bg-white p-6 rounded-lg shadow-xl flex flex-col items-center max-w-sm text-center">
-                                <p className="mb-6 font-medium text-gray-800">{confirmModal.message}</p>
-                                <div className="flex gap-4">
-                                    <button onClick={() => { confirmModal.onConfirm(); setConfirmModal(null); }} className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded shadow">Ya, Lanjutkan</button>
-                                    <button onClick={() => setConfirmModal(null)} className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-6 py-2 rounded shadow">Batal</button>
+                        <div className="fixed inset-0 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm z-50 px-4 transition-all">
+                            <div className="bg-white p-8 rounded-2xl shadow-2xl flex flex-col items-center max-w-sm text-center">
+                                <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mb-4"><IconTrash /></div>
+                                <p className="mb-6 font-medium text-slate-700 leading-relaxed">{confirmModal.message}</p>
+                                <div className="flex gap-3 w-full">
+                                    <button onClick={() => setConfirmModal(null)} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium px-4 py-2.5 rounded-xl transition-all">Batal</button>
+                                    <button onClick={() => { confirmModal.onConfirm(); setConfirmModal(null); }} className="flex-1 bg-red-600 hover:bg-red-700 text-white font-medium px-4 py-2.5 rounded-xl shadow-md transition-all active:scale-95">Ya, Lanjutkan</button>
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    <div className="w-full max-w-[1400px]">
-                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                    <div className="w-full max-w-[1450px]">
+                        {/* Header Atas */}
+                        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-5 bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
                             <div className="flex items-center gap-4">
-                                {/* Logo Perusahaan */}
-                                <img src="hoplun128.png" alt="Logo Hop Lun" className="h-10 w-auto object-contain" onError={(e) => { e.target.style.display = 'none'; }} />
+                                <div className="p-2 bg-slate-50 rounded-xl border border-slate-100 shadow-sm">
+                                    <img src="hoplun128.png" alt="Logo Hop Lun" className="h-10 w-auto object-contain" onError={(e) => { e.target.style.display = 'none'; }} />
+                                </div>
                                 <div>
-                                    <h1 className="text-2xl font-bold text-gray-800">Sistem Data Karyawan</h1>
-                                    <div className="flex items-center gap-2 mt-1">
-                                        {syncStatus === 'synced' && <><div className="w-2.5 h-2.5 rounded-full bg-green-500 shadow-[0_0_5px_#22c55e]"></div><span className="text-xs font-semibold text-green-700">Tersinkronisasi Realtime</span></>}
-                                        {syncStatus === 'error' && <><div className="w-2.5 h-2.5 rounded-full bg-red-500 shadow-[0_0_5px_#ef4444]"></div><span className="text-xs font-semibold text-red-700">Tidak Sinkron / Offline</span></>}
-                                        {syncStatus === 'saving' && <><div className="w-2.5 h-2.5 rounded-full bg-yellow-500 animate-pulse"></div><span className="text-xs font-semibold text-yellow-700">Menyimpan...</span></>}
-                                        {syncStatus === 'connecting' && <><div className="w-2.5 h-2.5 rounded-full bg-gray-400"></div><span className="text-xs font-semibold text-gray-600">Menghubungkan...</span></>}
+                                    <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Sistem Data Karyawan</h1>
+                                    <div className="flex items-center gap-2 mt-1.5">
+                                        {syncStatus === 'synced' && <><div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div><span className="text-xs font-medium text-emerald-700">Tersinkronisasi Realtime</span></>}
+                                        {syncStatus === 'error' && <><div className="w-2.5 h-2.5 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]"></div><span className="text-xs font-medium text-red-700">Tidak Sinkron / Offline</span></>}
+                                        {syncStatus === 'saving' && <><div className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></div><span className="text-xs font-medium text-amber-700">Menyimpan Perubahan...</span></>}
+                                        {syncStatus === 'connecting' && <><div className="w-2.5 h-2.5 rounded-full bg-slate-400 animate-pulse"></div><span className="text-xs font-medium text-slate-500">Menghubungkan...</span></>}
                                     </div>
                                 </div>
                             </div>
-                            <div className="flex flex-wrap gap-2">
-                                <button onClick={handleClearData} className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded shadow">
-                                    <IconTrash /> Reset
+                            <div className="flex flex-wrap gap-3">
+                                <button onClick={handleClearData} className="flex items-center gap-2 bg-white hover:bg-slate-50 text-red-600 border border-slate-200 font-medium px-5 py-2.5 rounded-xl shadow-sm transition-all active:scale-95">
+                                    <IconTrash /> Reset Data
                                 </button>
-                                <button onClick={handleExportExcelWithStyle} className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow">
+                                <button onClick={handleExportExcelWithStyle} className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-5 py-2.5 rounded-xl shadow-sm shadow-emerald-600/20 transition-all active:scale-95">
                                     <IconDownload /> Export Excel
                                 </button>
                             </div>
                         </div>
 
                         {/* PANEL KONTROL */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                            <table className="border-collapse border border-black w-full bg-white shadow-sm">
-                                <tbody>
-                                    <tr>
-                                        <td colSpan="2" style={{backgroundColor: '#ffff00'}} className="border border-black px-3 py-1.5 font-bold text-center">INPUT DATA</td>
-                                    </tr>
-                                    <tr>
-                                        <td style={{backgroundColor: '#ffff00'}} className="border border-black px-3 py-1.5 font-medium w-1/3">Bulan</td>
-                                        <td className="border border-black bg-white px-3 py-1.5 flex justify-between items-center">
-                                            <select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className="w-full outline-none font-medium bg-transparent">
-                                                {months.map(m => <option key={m} value={m}>{m}</option>)}
-                                            </select>
-                                            {months.length > 1 && (
-                                                <button onClick={() => handleDeleteMonth(selectedMonth)} className="text-red-500 hover:text-red-700 ml-2"><IconX /></button>
-                                            )}
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td style={{backgroundColor: '#ffff00'}} className="border border-black px-3 py-1.5 font-medium">Mode Input</td>
-                                        <td className="border border-black bg-white px-3 py-1.5">
-                                            <select value={inputType} onChange={(e) => setInputType(e.target.value)} className="w-full outline-none font-bold text-blue-700 bg-transparent">
-                                                <option value="actual">Input Aktual</option>
-                                                <option value="budget">Set Budget/Target</option>
-                                            </select>
-                                        </td>
-                                    </tr>
-                                    {categories.map((cat, idx) => (
-                                        <tr key={cat}>
-                                            <td style={{backgroundColor: idx === 0 ? '#ffc0cb' : '#ffff00'}} className="border border-black px-3 py-1.5 font-medium text-xs leading-tight">
-                                                <div className="flex justify-between items-center">
-                                                    <span>{cat}</span>
-                                                    <button onClick={() => handleDeleteCategory(cat)} className="text-red-500 hover:text-red-800 ml-2"><IconX /></button>
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8">
+                            
+                            {/* Panel Input Form */}
+                            <div className="lg:col-span-6 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                                <div className="bg-indigo-600 px-5 py-3.5 flex justify-between items-center">
+                                    <h2 className="text-white font-semibold flex items-center gap-2">
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                                        Panel Input Data
+                                    </h2>
+                                </div>
+                                <div className="p-5">
+                                    <div className="grid grid-cols-2 gap-4 mb-6">
+                                        <div>
+                                            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Pilih Bulan</label>
+                                            <div className="relative">
+                                                <select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className="w-full appearance-none bg-slate-50 border border-slate-200 text-slate-800 font-medium py-2.5 pl-3 pr-10 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-shadow cursor-pointer">
+                                                    {months.map(m => <option key={m} value={m}>{m}</option>)}
+                                                </select>
+                                                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-500">
+                                                    <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
                                                 </div>
-                                            </td>
-                                            <td className="border border-black bg-white px-3 py-1.5">
-                                                <input type="number" value={inputType === 'actual' ? (actuals[selectedMonth]?.[cat] ?? '') : (budgets[selectedMonth]?.[cat] ?? '')} onChange={(e) => handleInputChange(cat, e.target.value)} className="w-full text-right outline-none bg-transparent" placeholder="0" />
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Mode Input</label>
+                                            <div className="relative">
+                                                <select value={inputType} onChange={(e) => setInputType(e.target.value)} className="w-full appearance-none bg-indigo-50 border border-indigo-100 text-indigo-700 font-bold py-2.5 pl-3 pr-10 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 transition-shadow cursor-pointer">
+                                                    <option value="actual">🔢 Input Aktual</option>
+                                                    <option value="budget">🎯 Set Target / Budget</option>
+                                                </select>
+                                                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-indigo-500">
+                                                    <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
 
-                            <div className="bg-white p-5 border border-gray-300 rounded shadow-sm flex flex-col justify-center">
-                                <h3 className="font-bold text-gray-700 mb-2 border-b pb-2">Tambah Kategori Baru</h3>
-                                <input type="text" value={newCategoryStr} onChange={(e) => setNewCategoryStr(e.target.value)} className="border border-gray-300 p-2 rounded mb-3 outline-none uppercase" placeholder="Contoh: STAFF IT..." />
-                                <button onClick={handleAddCategory} className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white py-2 rounded"><IconPlus /> Tambah Baris</button>
+                                    <div className="space-y-3">
+                                        {categories.map((cat) => (
+                                            <div key={cat} className="flex items-center gap-3 p-3 rounded-xl border border-slate-100 bg-slate-50 hover:border-slate-300 transition-colors">
+                                                <div className="flex-1 flex justify-between items-center pr-2">
+                                                    <span className="font-semibold text-sm text-slate-700">{cat}</span>
+                                                    <button onClick={() => handleDeleteCategory(cat)} className="text-slate-400 hover:text-red-500 p-1 rounded-md hover:bg-white transition-colors" title="Hapus Kategori"><IconX /></button>
+                                                </div>
+                                                <div className="w-1/3">
+                                                    <input type="number" value={inputType === 'actual' ? (actuals[selectedMonth]?.[cat] ?? '') : (budgets[selectedMonth]?.[cat] ?? '')} onChange={(e) => handleInputChange(cat, e.target.value)} className="w-full text-right font-semibold text-slate-800 bg-white border border-slate-200 py-2 px-3 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 shadow-inner" placeholder="0" />
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
                             </div>
 
-                            <div className="bg-white p-5 border border-gray-300 rounded shadow-sm flex flex-col justify-center">
-                                <h3 className="font-bold text-gray-700 mb-2 border-b pb-2">Tambah Bulan Baru</h3>
-                                <input type="text" value={newMonthStr} onChange={(e) => setNewMonthStr(e.target.value)} className="border border-gray-300 p-2 rounded mb-3 outline-none" placeholder="Masukkan teks..." />
-                                <button onClick={handleAddMonth} className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded"><IconPlus /> Tambah Kolom</button>
+                            {/* Panel Tambah */}
+                            <div className="lg:col-span-6 flex flex-col gap-6">
+                                {/* Tambah Kategori */}
+                                <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex-1 flex flex-col justify-center relative overflow-hidden">
+                                    <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-50 rounded-bl-full -z-10"></div>
+                                    <h3 className="font-semibold text-slate-800 mb-1">Tambah Kategori Baru (Baris)</h3>
+                                    <p className="text-xs text-slate-500 mb-4">Tambahkan baris kriteria karyawan baru ke dalam tabel.</p>
+                                    <div className="flex gap-3">
+                                        <input type="text" value={newCategoryStr} onChange={(e) => setNewCategoryStr(e.target.value)} className="flex-1 border border-slate-200 py-2.5 px-4 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 uppercase text-sm font-medium placeholder-slate-400" placeholder="Contoh: STAFF IT..." />
+                                        <button onClick={handleAddCategory} className="flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 text-white px-5 py-2.5 rounded-xl shadow-sm transition-all active:scale-95 font-medium whitespace-nowrap"><IconPlus /> Tambah</button>
+                                    </div>
+                                </div>
+
+                                {/* Tambah Bulan */}
+                                <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex-1 flex flex-col justify-center relative overflow-hidden">
+                                    <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50 rounded-bl-full -z-10"></div>
+                                    <h3 className="font-semibold text-slate-800 mb-1">Tambah Bulan Baru (Kolom)</h3>
+                                    <p className="text-xs text-slate-500 mb-4">Tambahkan kolom periode/bulan baru ke dalam tabel.</p>
+                                    <div className="flex gap-3">
+                                        <input type="text" value={newMonthStr} onChange={(e) => setNewMonthStr(e.target.value)} className="flex-1 border border-slate-200 py-2.5 px-4 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm font-medium placeholder-slate-400" placeholder="Contoh: Jul-26" />
+                                        <button onClick={handleAddMonth} className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl shadow-sm transition-all active:scale-95 font-medium whitespace-nowrap"><IconPlus /> Tambah</button>
+                                    </div>
+                                </div>
                             </div>
+
                         </div>
 
-                        {/* TABEL OUTPUT */}
-                        <div className="overflow-x-auto w-full pb-8 bg-white p-2 shadow-sm border border-gray-200">
-                            <table id="dataTable" className="border-collapse w-full min-w-max text-center" border="1">
-                                <thead>
-                                    <tr style={{backgroundColor: '#ffc0cb'}}>
-                                        <th className="border border-black px-2 py-2 font-bold" rowSpan="2">NO.</th>
-                                        <th className="border border-black px-2 py-2 font-bold w-[220px]" rowSpan="2">EMPLOYEE CATEGORIES</th>
-                                        <th className="border border-black px-2 py-2 font-bold w-[120px]" rowSpan="2">DETAIL</th>
-                                        {months.map(m => (
-                                            <th key={m} colSpan="3" style={{backgroundColor: '#ffc0cb'}} className="border border-black px-2 py-1 font-bold relative group">
-                                                {m}
-                                                {months.length > 1 && (
-                                                    <button onClick={() => handleDeleteMonth(m)} className="absolute top-1 right-1 text-red-600 hidden group-hover:block"><IconX /></button>
-                                                )}
-                                            </th>
-                                        ))}
-                                        <th colSpan="3" style={{backgroundColor: '#e5e7eb'}} className="border border-black px-2 py-1 font-bold">TOTAL ALL</th>
-                                    </tr>
-                                    <tr>
-                                        {months.map(m => (
-                                            <React.Fragment key={`sub-${m}`}>
-                                                <th style={{backgroundColor: '#ffffff'}} className="border border-black font-normal py-1 px-2 min-w-[60px]">Budget</th>
-                                                <th style={{backgroundColor: '#ffffff'}} className="border border-black font-normal py-1 px-2 min-w-[60px]">Actual</th>
-                                                <th style={{backgroundColor: '#ffffff'}} className="border border-black font-normal py-1 px-2 min-w-[60px]">Balance</th>
-                                            </React.Fragment>
-                                        ))}
-                                        <th style={{backgroundColor: '#f3f4f6'}} className="border border-black font-bold py-1 px-2 min-w-[70px]">Budget</th>
-                                        <th style={{backgroundColor: '#f3f4f6'}} className="border border-black font-bold py-1 px-2 min-w-[70px]">Actual</th>
-                                        <th style={{backgroundColor: '#f3f4f6'}} className="border border-black font-bold py-1 px-2 min-w-[70px]">Balance</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {categories.map((cat, idx) => {
-                                        const isFirst = idx === 0;
-                                        const bgColorKiri = isFirst ? '#ffc0cb' : '#ffff00';
-                                        return (
-                                            <tr key={cat}>
-                                                {isFirst && <td rowSpan={categories.length} style={{backgroundColor: '#ffc0cb'}} className="border border-black align-middle font-bold">1</td>}
-                                                <td style={{backgroundColor: bgColorKiri}} className="border border-black text-left px-3 font-medium text-xs leading-tight">{cat}</td>
-                                                {isFirst && <td style={{backgroundColor: '#ffffff'}} className="border border-black">Requirement</td>}
-                                                {idx === 1 && <td rowSpan={categories.length - 1} style={{backgroundColor: '#ffff00'}} className="border border-black align-middle">Target</td>}
-                                                {months.map(m => (
-                                                    <React.Fragment key={`${cat}-${m}`}>
-                                                        <td style={{backgroundColor: bgColorKiri}} className="border border-black text-right px-2">{calculatedData.calc[m][cat].budget}</td>
-                                                        <td style={{backgroundColor: '#ffff00'}} className="border border-black text-right px-2">{calculatedData.calc[m][cat].actual}</td>
-                                                        <td style={{backgroundColor: '#ffffff'}} className="border border-black text-right px-2">{calculatedData.calc[m][cat].balance}</td>
-                                                    </React.Fragment>
-                                                ))}
-                                                <td style={{backgroundColor: '#f3f4f6'}} className="border border-black text-right px-2 font-bold">{calculatedData.totals[cat].b}</td>
-                                                <td style={{backgroundColor: '#f3f4f6'}} className="border border-black text-right px-2 font-bold">{calculatedData.totals[cat].a}</td>
-                                                <td style={{backgroundColor: '#f3f4f6'}} className="border border-black text-right px-2 font-bold">{calculatedData.totals[cat].bal}</td>
-                                            </tr>
-                                        );
-                                    })}
-                                    <tr style={{backgroundColor: '#ffc0cb'}} className="font-bold">
-                                        <td colSpan="3" style={{backgroundColor: '#ffc0cb'}} className="border border-black text-left px-4 tracking-wider">TOTAL</td>
-                                        {months.map(m => (
-                                            <React.Fragment key={`total-${m}`}>
-                                                <td style={{backgroundColor: '#ffc0cb'}} className="border border-black text-right px-2">{calculatedData.monthlyTotals[m].budget}</td>
-                                                <td style={{backgroundColor: '#ffc0cb'}} className="border border-black text-right px-2">{calculatedData.monthlyTotals[m].actual}</td>
-                                                <td style={{backgroundColor: '#ffc0cb'}} className="border border-black text-right px-2">{calculatedData.monthlyTotals[m].balance}</td>
-                                            </React.Fragment>
-                                        ))}
-                                        <td style={{backgroundColor: '#e5e7eb'}} className="border border-black text-right px-2">{calculatedData.grandTotal.budget}</td>
-                                        <td style={{backgroundColor: '#e5e7eb'}} className="border border-black text-right px-2">{calculatedData.grandTotal.actual}</td>
-                                        <td style={{backgroundColor: '#e5e7eb'}} className="border border-black text-right px-2">{calculatedData.grandTotal.balance}</td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                        {/* TABEL OUTPUT (Beautiful Table) */}
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                            <div className="overflow-x-auto p-1">
+                                <table id="dataTable" className="border-collapse w-full min-w-max text-center" style={{ border: `1px solid ${colors.border}` }}>
+                                    <thead>
+                                        <tr>
+                                            <th style={headerStyle} rowSpan="2" className="w-12">NO.</th>
+                                            <th style={headerStyle} rowSpan="2" className="text-left">EMPLOYEE CATEGORIES</th>
+                                            <th style={headerStyle} rowSpan="2" className="w-28 text-left">DETAIL</th>
+                                            {months.map(m => (
+                                                <th key={m} colSpan="3" style={headerStyle} className="relative group">
+                                                    <div className="flex justify-center items-center gap-2">
+                                                        {m}
+                                                        {months.length > 1 && (
+                                                            <button onClick={() => handleDeleteMonth(m)} className="text-slate-400 hover:text-white transition-colors" title="Hapus Bulan"><IconX /></button>
+                                                        )}
+                                                    </div>
+                                                </th>
+                                            ))}
+                                            <th colSpan="3" style={totalAllHeaderStyle}>TOTAL ALL</th>
+                                        </tr>
+                                        <tr>
+                                            {months.map(m => (
+                                                <React.Fragment key={`sub-${m}`}>
+                                                    <th style={subHeaderStyle} className="w-20">Budget</th>
+                                                    <th style={subHeaderStyle} className="w-20">Actual</th>
+                                                    <th style={subHeaderStyle} className="w-20">Balance</th>
+                                                </React.Fragment>
+                                            ))}
+                                            <th style={{...subHeaderStyle, backgroundColor: '#e2e8f0', color: '#1e293b'}} className="w-24">Budget</th>
+                                            <th style={{...subHeaderStyle, backgroundColor: '#e2e8f0', color: '#1e293b'}} className="w-24">Actual</th>
+                                            <th style={{...subHeaderStyle, backgroundColor: '#e2e8f0', color: '#1e293b'}} className="w-24">Balance</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {categories.map((cat, idx) => {
+                                            const isFirst = idx === 0;
+                                            const bgColor = idx % 2 === 0 ? colors.rowEven : colors.rowOdd;
+                                            
+                                            return (
+                                                <tr key={cat} className="hover:bg-slate-50 transition-colors">
+                                                    {isFirst && <td rowSpan={categories.length} style={{...cellStyle, backgroundColor: colors.rowEven, fontWeight: 'bold', color: colors.textNormal, verticalAlign: 'middle'}}>1</td>}
+                                                    <td style={{...cellStyle, backgroundColor: bgColor, textAlign: 'left', fontWeight: '500', color: colors.textNormal}}>{cat}</td>
+                                                    {isFirst && <td style={{...cellStyle, backgroundColor: colors.rowEven, textAlign: 'left', color: colors.subHeaderText}}>Requirement</td>}
+                                                    {idx === 1 && <td rowSpan={categories.length - 1} style={{...cellStyle, backgroundColor: colors.rowEven, textAlign: 'left', color: colors.subHeaderText, verticalAlign: 'middle'}}>Target</td>}
+                                                    
+                                                    {months.map(m => {
+                                                        const data = calculatedData.calc[m][cat];
+                                                        // Format kondisional warna khusus
+                                                        const actualStyle = getNumberStyle(data.actual, data.budget, false);
+                                                        const balanceStyle = getNumberStyle(data.actual, data.budget, true);
+
+                                                        return (
+                                                            <React.Fragment key={`${cat}-${m}`}>
+                                                                <td style={{...cellStyle, backgroundColor: bgColor, color: colors.textNormal}}>{data.budget}</td>
+                                                                <td style={{...cellStyle, backgroundColor: bgColor, color: actualStyle.color, fontWeight: actualStyle.fontWeight}}>{data.actual}</td>
+                                                                <td style={{...cellStyle, backgroundColor: bgColor, color: balanceStyle.color, fontWeight: balanceStyle.fontWeight}}>{data.balance}</td>
+                                                            </React.Fragment>
+                                                        )
+                                                    })}
+                                                    <td style={{...cellStyle, backgroundColor: '#f8fafc', fontWeight: '600', color: colors.textNormal}}>{calculatedData.totals[cat].b}</td>
+                                                    <td style={{...cellStyle, backgroundColor: '#f8fafc', fontWeight: '600', color: colors.textNormal}}>{calculatedData.totals[cat].a}</td>
+                                                    <td style={{...cellStyle, backgroundColor: '#f8fafc', fontWeight: '600', color: colors.textNormal}}>{calculatedData.totals[cat].bal}</td>
+                                                </tr>
+                                            );
+                                        })}
+                                        {/* Baris TOTAL Terbawah */}
+                                        <tr>
+                                            <td colSpan="3" style={{...cellStyle, backgroundColor: colors.totalRowBg, color: colors.totalRowText, fontWeight: '700', textAlign: 'left', letterSpacing: '0.05em'}}>GRAND TOTAL</td>
+                                            {months.map(m => (
+                                                <React.Fragment key={`total-${m}`}>
+                                                    <td style={{...cellStyle, backgroundColor: colors.totalRowBg, color: colors.totalRowText, fontWeight: '700'}}>{calculatedData.monthlyTotals[m].budget}</td>
+                                                    <td style={{...cellStyle, backgroundColor: colors.totalRowBg, color: colors.totalRowText, fontWeight: '700'}}>{calculatedData.monthlyTotals[m].actual}</td>
+                                                    <td style={{...cellStyle, backgroundColor: colors.totalRowBg, color: colors.totalRowText, fontWeight: '700'}}>{calculatedData.monthlyTotals[m].balance}</td>
+                                                </React.Fragment>
+                                            ))}
+                                            <td style={{...cellStyle, backgroundColor: colors.totalAllBg, color: '#ffffff', fontWeight: '700'}}>{calculatedData.grandTotal.budget}</td>
+                                            <td style={{...cellStyle, backgroundColor: colors.totalAllBg, color: '#ffffff', fontWeight: '700'}}>{calculatedData.grandTotal.actual}</td>
+                                            <td style={{...cellStyle, backgroundColor: colors.totalAllBg, color: '#ffffff', fontWeight: '700'}}>{calculatedData.grandTotal.balance}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 </div>

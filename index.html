@@ -76,10 +76,13 @@
             totalRowBg: '#e0e7ff',   // Indigo-100
             totalRowText: '#3730a3', // Indigo-800
             border: '#cbd5e1',       // Slate-300
+            thickBorder: '#475569',  // Slate-600 (Garis tebal)
             textNormal: '#1e293b',   // Slate-800
             textRed: '#dc2626',      // Red-600
             textGreen: '#16a34a'     // Green-600
         };
+
+        const thickRight = { borderRight: `3px solid ${colors.thickBorder}` };
 
         // Helper untuk mewarnai angka secara kondisional
         const getNumberStyle = (actual, budget, isBalance = false) => {
@@ -299,7 +302,7 @@
             const subHeaderStyle = { ...cellStyle, backgroundColor: colors.subHeaderBg, color: colors.subHeaderText, fontWeight: '600', fontSize: '0.8rem' };
 
             return (
-                <div className="min-h-screen p-6 md:p-10 text-slate-800 flex flex-col items-center relative">
+                <div className="min-h-screen p-3 sm:p-6 md:p-10 text-slate-800 flex flex-col items-center relative w-full overflow-hidden">
                     {/* MODALS */}
                     {messageModal && (
                         <div className="fixed inset-0 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm z-50 px-4 transition-all">
@@ -352,18 +355,18 @@
                         </div>
 
                         {/* PANEL KONTROL */}
-                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8">
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8 w-full">
                             
                             {/* Panel Input Form */}
                             <div className="lg:col-span-6 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                                 <div className="bg-indigo-600 px-5 py-3.5 flex justify-between items-center">
-                                    <h2 className="text-white font-semibold flex items-center gap-2">
+                                    <h2 className="text-white font-semibold flex items-center gap-2 text-sm sm:text-base">
                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
                                         Panel Input Data
                                     </h2>
                                 </div>
-                                <div className="p-5">
-                                    <div className="grid grid-cols-2 gap-4 mb-6">
+                                <div className="p-4 sm:p-5">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
                                         <div>
                                             <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Pilih Bulan</label>
                                             <div className="relative">
@@ -391,12 +394,12 @@
 
                                     <div className="space-y-3">
                                         {categories.map((cat) => (
-                                            <div key={cat} className="flex items-center gap-3 p-3 rounded-xl border border-slate-100 bg-slate-50 hover:border-slate-300 transition-colors">
+                                            <div key={cat} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 p-3 rounded-xl border border-slate-100 bg-slate-50 hover:border-slate-300 transition-colors">
                                                 <div className="flex-1 flex justify-between items-center pr-2">
                                                     <span className="font-semibold text-sm text-slate-700">{cat}</span>
                                                     <button onClick={() => handleDeleteCategory(cat)} className="text-slate-400 hover:text-red-500 p-1 rounded-md hover:bg-white transition-colors" title="Hapus Kategori"><IconX /></button>
                                                 </div>
-                                                <div className="w-1/3">
+                                                <div className="w-full sm:w-1/3">
                                                     <input type="number" value={inputType === 'actual' ? (actuals[selectedMonth]?.[cat] ?? '') : (budgets[selectedMonth]?.[cat] ?? '')} onChange={(e) => handleInputChange(cat, e.target.value)} className="w-full text-right font-semibold text-slate-800 bg-white border border-slate-200 py-2 px-3 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 shadow-inner" placeholder="0" />
                                                 </div>
                                             </div>
@@ -408,22 +411,22 @@
                             {/* Panel Tambah */}
                             <div className="lg:col-span-6 flex flex-col gap-6">
                                 {/* Tambah Kategori */}
-                                <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex-1 flex flex-col justify-center relative overflow-hidden">
+                                <div className="bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-slate-200 flex-1 flex flex-col justify-center relative overflow-hidden">
                                     <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-50 rounded-bl-full -z-10"></div>
-                                    <h3 className="font-semibold text-slate-800 mb-1">Tambah Kategori Baru (Baris)</h3>
+                                    <h3 className="font-semibold text-slate-800 mb-1 text-sm sm:text-base">Tambah Kategori Baru (Baris)</h3>
                                     <p className="text-xs text-slate-500 mb-4">Tambahkan baris kriteria karyawan baru ke dalam tabel.</p>
-                                    <div className="flex gap-3">
+                                    <div className="flex flex-col sm:flex-row gap-3">
                                         <input type="text" value={newCategoryStr} onChange={(e) => setNewCategoryStr(e.target.value)} className="flex-1 border border-slate-200 py-2.5 px-4 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 uppercase text-sm font-medium placeholder-slate-400" placeholder="Contoh: STAFF IT..." />
                                         <button onClick={handleAddCategory} className="flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 text-white px-5 py-2.5 rounded-xl shadow-sm transition-all active:scale-95 font-medium whitespace-nowrap"><IconPlus /> Tambah</button>
                                     </div>
                                 </div>
 
                                 {/* Tambah Bulan */}
-                                <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex-1 flex flex-col justify-center relative overflow-hidden">
+                                <div className="bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-slate-200 flex-1 flex flex-col justify-center relative overflow-hidden">
                                     <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50 rounded-bl-full -z-10"></div>
-                                    <h3 className="font-semibold text-slate-800 mb-1">Tambah Bulan Baru (Kolom)</h3>
+                                    <h3 className="font-semibold text-slate-800 mb-1 text-sm sm:text-base">Tambah Bulan Baru (Kolom)</h3>
                                     <p className="text-xs text-slate-500 mb-4">Tambahkan kolom periode/bulan baru ke dalam tabel.</p>
-                                    <div className="flex gap-3">
+                                    <div className="flex flex-col sm:flex-row gap-3">
                                         <input type="text" value={newMonthStr} onChange={(e) => setNewMonthStr(e.target.value)} className="flex-1 border border-slate-200 py-2.5 px-4 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm font-medium placeholder-slate-400" placeholder="Contoh: Jul-26" />
                                         <button onClick={handleAddMonth} className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl shadow-sm transition-all active:scale-95 font-medium whitespace-nowrap"><IconPlus /> Tambah</button>
                                     </div>
@@ -433,16 +436,16 @@
                         </div>
 
                         {/* TABEL OUTPUT (Beautiful Table) */}
-                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                            <div className="overflow-x-auto p-1">
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden w-full">
+                            <div className="overflow-x-auto p-1 w-full" style={{ WebkitOverflowScrolling: 'touch' }}>
                                 <table id="dataTable" className="border-collapse w-full min-w-max text-center" style={{ border: `1px solid ${colors.border}` }}>
                                     <thead>
                                         <tr>
                                             <th style={headerStyle} rowSpan="2" className="w-12">NO.</th>
                                             <th style={headerStyle} rowSpan="2" className="text-left">EMPLOYEE CATEGORIES</th>
-                                            <th style={headerStyle} rowSpan="2" className="w-28 text-left">DETAIL</th>
+                                            <th style={{...headerStyle, ...thickRight}} rowSpan="2" className="w-28 text-left">DETAIL</th>
                                             {months.map(m => (
-                                                <th key={m} colSpan="3" style={headerStyle} className="relative group">
+                                                <th key={m} colSpan="3" style={{...headerStyle, ...thickRight}} className="relative group">
                                                     <div className="flex justify-center items-center gap-2">
                                                         {m}
                                                         {months.length > 1 && (
@@ -458,7 +461,7 @@
                                                 <React.Fragment key={`sub-${m}`}>
                                                     <th style={subHeaderStyle} className="w-20">Budget</th>
                                                     <th style={subHeaderStyle} className="w-20">Actual</th>
-                                                    <th style={subHeaderStyle} className="w-20">Balance</th>
+                                                    <th style={{...subHeaderStyle, ...thickRight}} className="w-20">Balance</th>
                                                 </React.Fragment>
                                             ))}
                                             <th style={{...subHeaderStyle, backgroundColor: '#e2e8f0', color: '#1e293b'}} className="w-24">Budget</th>
@@ -475,8 +478,8 @@
                                                 <tr key={cat} className="hover:bg-slate-50 transition-colors">
                                                     {isFirst && <td rowSpan={categories.length} style={{...cellStyle, backgroundColor: colors.rowEven, fontWeight: 'bold', color: colors.textNormal, verticalAlign: 'middle'}}>1</td>}
                                                     <td style={{...cellStyle, backgroundColor: bgColor, textAlign: 'left', fontWeight: '500', color: colors.textNormal}}>{cat}</td>
-                                                    {isFirst && <td style={{...cellStyle, backgroundColor: colors.rowEven, textAlign: 'left', color: colors.subHeaderText}}>Requirement</td>}
-                                                    {idx === 1 && <td rowSpan={categories.length - 1} style={{...cellStyle, backgroundColor: colors.rowEven, textAlign: 'left', color: colors.subHeaderText, verticalAlign: 'middle'}}>Target</td>}
+                                                    {isFirst && <td style={{...cellStyle, backgroundColor: colors.rowEven, textAlign: 'left', color: colors.subHeaderText, ...thickRight}}>Requirement</td>}
+                                                    {idx === 1 && <td rowSpan={categories.length - 1} style={{...cellStyle, backgroundColor: colors.rowEven, textAlign: 'left', color: colors.subHeaderText, verticalAlign: 'middle', ...thickRight}}>Target</td>}
                                                     
                                                     {months.map(m => {
                                                         const data = calculatedData.calc[m][cat];
@@ -488,7 +491,7 @@
                                                             <React.Fragment key={`${cat}-${m}`}>
                                                                 <td style={{...cellStyle, backgroundColor: bgColor, color: colors.textNormal}}>{data.budget}</td>
                                                                 <td style={{...cellStyle, backgroundColor: bgColor, color: actualStyle.color, fontWeight: actualStyle.fontWeight}}>{data.actual}</td>
-                                                                <td style={{...cellStyle, backgroundColor: bgColor, color: balanceStyle.color, fontWeight: balanceStyle.fontWeight}}>{data.balance}</td>
+                                                                <td style={{...cellStyle, backgroundColor: bgColor, color: balanceStyle.color, fontWeight: balanceStyle.fontWeight, ...thickRight}}>{data.balance}</td>
                                                             </React.Fragment>
                                                         )
                                                     })}
@@ -500,12 +503,12 @@
                                         })}
                                         {/* Baris TOTAL Terbawah */}
                                         <tr>
-                                            <td colSpan="3" style={{...cellStyle, backgroundColor: colors.totalRowBg, color: colors.totalRowText, fontWeight: '700', textAlign: 'left', letterSpacing: '0.05em'}}>GRAND TOTAL</td>
+                                            <td colSpan="3" style={{...cellStyle, backgroundColor: colors.totalRowBg, color: colors.totalRowText, fontWeight: '700', textAlign: 'left', letterSpacing: '0.05em', ...thickRight}}>GRAND TOTAL</td>
                                             {months.map(m => (
                                                 <React.Fragment key={`total-${m}`}>
                                                     <td style={{...cellStyle, backgroundColor: colors.totalRowBg, color: colors.totalRowText, fontWeight: '700'}}>{calculatedData.monthlyTotals[m].budget}</td>
                                                     <td style={{...cellStyle, backgroundColor: colors.totalRowBg, color: colors.totalRowText, fontWeight: '700'}}>{calculatedData.monthlyTotals[m].actual}</td>
-                                                    <td style={{...cellStyle, backgroundColor: colors.totalRowBg, color: colors.totalRowText, fontWeight: '700'}}>{calculatedData.monthlyTotals[m].balance}</td>
+                                                    <td style={{...cellStyle, backgroundColor: colors.totalRowBg, color: colors.totalRowText, fontWeight: '700', ...thickRight}}>{calculatedData.monthlyTotals[m].balance}</td>
                                                 </React.Fragment>
                                             ))}
                                             <td style={{...cellStyle, backgroundColor: colors.totalAllBg, color: '#ffffff', fontWeight: '700'}}>{calculatedData.grandTotal.budget}</td>

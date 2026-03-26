@@ -69,25 +69,30 @@
             rowEven: '#ffffff', rowOdd: '#f8fafc',
             totalRowBg: '#e0e7ff', totalRowText: '#3730a3',
             border: '#cbd5e1', thickBorder: '#475569',
-            textNormal: '#1e293b', textRed: '#dc2626', textGreen: '#16a34a'
+            textNormal: '#1e293b', textRed: '#dc2626', textGreen: '#16a34a', textYellow: '#d97706'
         };
 
         const thickRight = { borderRight: `3px solid ${colors.thickBorder}` };
 
         // Helper Format Warna
-        const getNumberStyle = (actual, target, isBalance = false) => {
-            const different = target - actual;
+        const getNumberStyle = (actual, target) => {
+            const diff = actual - target; // Logika Baru: Actual - Target
             let color = colors.textNormal;
             let fontWeight = 'normal';
 
-            if (target > 0) {
-                if (different > 0) {
-                    color = colors.textRed; fontWeight = 'bold'; // Defisit (Merah)
-                } else if (different === 0) {
-                    color = colors.textGreen; fontWeight = 'bold'; // Pas Target (Hijau)
+            if (target !== 0 || actual !== 0 || diff !== 0) {
+                if (diff < 0) {
+                    color = colors.textRed; fontWeight = 'bold'; // Defisit (Minus = Merah)
+                } else if (diff >= 0) {
+                    color = colors.textGreen; fontWeight = 'bold'; // Surplus/Pas (Plus/Nol = Hijau)
                 }
             }
             return { color, fontWeight };
+        };
+
+        // Helper untuk menambahkan tanda + (plus) jika nilai positif
+        const formatDiff = (val) => {
+            return val > 0 ? `+${val}` : val;
         };
 
         // --- HELPER UNTUK TANGGAL DINAMIS ---
@@ -226,58 +231,70 @@
                 return () => clearTimeout(timeoutId);
             }, [months, groups, dailyData]);
 
-            // --- LOGIKA KALKULASI DATA (TARGET MENGIKUTI SISA/DIFF HARI SEBELUMNYA) ---
+            // --- LOGIKA KALKULASI DATA (KUMULATIF BERKELANJUTAN) ---
             const calculatedData = useMemo(() => {
                 const calcDaily = {}; 
                 const calcMonthly = {};
                 const grandTotals = {}; 
                 
                 const allCats = groups.flatMap(g => g.categories);
-                allCats.forEach(cat => { grandTotals[cat] = { b: 0, a: 0, diff: 0 }; });
+                let cumulativeTarget = {};
+                let cumulativeActual = {};
+                
+                allCats.forEach(cat => { 
+                    grandTotals[cat] = { b: 0, a: 0, diff: 0 }; 
+                    cumulativeTarget[cat] = 0;
+                    cumulativeActual[cat] = 0;
+                });
 
                 months.forEach(month => {
                     calcDaily[month] = {};
                     calcMonthly[month] = {};
-                    allCats.forEach(cat => calcMonthly[month][cat] = { target: 0, actual: 0, diff: 0 });
+                    allCats.forEach(cat => calcMonthly[month][cat] = { target: 0, actual: 0, diff: 0, inputTarget: 0 });
 
                     const { start, end } = getMonthRange(month);
                     
                     allCats.forEach(cat => {
-                        let currentTarget = 0;
                         let monthlyActualSum = 0;
+                        let inputTargetForMonth = 0;
 
                         for(let d = start; d <= end; d++) {
                             if (!calcDaily[month][d]) calcDaily[month][d] = {};
                             
-                            // Pada tanggal PERTAMA di bulan tersebut, Target diambil dari input awal
+                            // Pada tanggal PERTAMA di bulan tersebut, Tambahkan input target ke kumulatif target
                             if (d === start) {
-                                currentTarget = dailyData[month]?.[d]?.[cat]?.target || 0;
-                                calcMonthly[month][cat].target = currentTarget; // Target total bulanan
+                                inputTargetForMonth = dailyData[month]?.[d]?.[cat]?.target || 0;
+                                cumulativeTarget[cat] += inputTargetForMonth;
+                                calcMonthly[month][cat].inputTarget = inputTargetForMonth;
                             }
 
-                            const actual = dailyData[month]?.[d]?.[cat]?.actual || 0;
-                            
-                            // Hitung Sisa (Diff)
-                            let diff = currentTarget - actual;
-                            // Cegah target menjadi minus (jika target sdh terpenuhi / actual berlebih)
-                            if (diff < 0) diff = 0; 
+                            // Target hari ini = Sisa target yang belum tercapai (Kumulatif Target - Kumulatif Aktual sblmnya)
+                            let targetShown = cumulativeTarget[cat] - cumulativeActual[cat];
+                            if (targetShown < 0) targetShown = 0; // Jika surplus, target hari ini 0
 
-                            calcDaily[month][d][cat] = { target: currentTarget, actual, diff };
-                            
+                            const actual = dailyData[month]?.[d]?.[cat]?.actual || 0;
+                            cumulativeActual[cat] += actual;
                             monthlyActualSum += actual;
-                            // Target untuk hari esok adalah SISA (Diff) dari hari ini
-                            currentTarget = diff; 
+                            
+                            // Diff = Kumulatif Aktual - Kumulatif Target (Plus = Surplus, Minus = Defisit)
+                            let diff = cumulativeActual[cat] - cumulativeTarget[cat];
+
+                            calcDaily[month][d][cat] = { target: targetShown, actual, diff };
                         }
 
+                        // Target Bulanan = Target yang tampil di awal bulan (termasuk carryover)
+                        calcMonthly[month][cat].target = calcDaily[month][start][cat].target;
                         calcMonthly[month][cat].actual = monthlyActualSum;
-                        let mDiff = calcMonthly[month][cat].target - monthlyActualSum;
-                        if (mDiff < 0) mDiff = 0;
-                        calcMonthly[month][cat].diff = mDiff;
+                        calcMonthly[month][cat].diff = cumulativeActual[cat] - cumulativeTarget[cat]; // Sisa di akhir bulan
 
-                        grandTotals[cat].b += calcMonthly[month][cat].target;
-                        grandTotals[cat].a += calcMonthly[month][cat].actual;
-                        grandTotals[cat].diff += calcMonthly[month][cat].diff;
+                        // Grand Total: B = Total Input Target Asli (agar tidak hitung ganda carryover), A = Total Aktual
+                        grandTotals[cat].b += inputTargetForMonth;
+                        grandTotals[cat].a += monthlyActualSum;
                     });
+                });
+
+                allCats.forEach(cat => {
+                    grandTotals[cat].diff = grandTotals[cat].a - grandTotals[cat].b; // Total Actual - Total Target
                 });
 
                 // Total Vertikal per Bulan
@@ -303,9 +320,9 @@
                     });
                 }
 
-                let finalGb=0, finalGa=0, finalGdiff=0;
-                allCats.forEach(c => { finalGb+=grandTotals[c].b; finalGa+=grandTotals[c].a; finalGdiff+=grandTotals[c].diff; });
-                const finalGrandTotal = { target: finalGb, actual: finalGa, diff: finalGdiff };
+                let finalGb=0, finalGa=0;
+                allCats.forEach(c => { finalGb+=grandTotals[c].b; finalGa+=grandTotals[c].a; });
+                const finalGrandTotal = { target: finalGb, actual: finalGa, diff: finalGa - finalGb };
 
                 return { calcDaily, calcMonthly, grandTotals, monthlyVertTotals, dailyVertTotals, finalGrandTotal, allCats };
             }, [months, groups, dailyData, viewMode, selectedMonth]);
@@ -480,22 +497,27 @@
                                     
                                     {dataSource.map(colId => {
                                         const data = getColData(colId, cat);
-                                        const actualStyle = getNumberStyle(data.actual, data.target, false);
-                                        const diffStyle = getNumberStyle(data.actual, data.target, true);
+                                        const actualStyle = getNumberStyle(data.actual, data.target);
+                                        const diffStyle = getNumberStyle(data.actual, data.target);
+                                        
+                                        // Peringatan Kuning jika target menyentuh 0 (atau surplus/minus) dan Kategori tsb memang pernah diberi target.
+                                        const targetStyle = (data.target <= 0 && calculatedData.grandTotals[cat].b > 0) 
+                                                            ? { color: colors.textYellow, fontWeight: 'bold' } 
+                                                            : { color: colors.textNormal, fontWeight: 'normal' };
 
                                         return (
                                             <React.Fragment key={`${cat}-${colId}`}>
-                                                <td style={{...cellStyle, backgroundColor: bgColor}}>{data.target}</td>
+                                                <td style={{...cellStyle, backgroundColor: bgColor, color: targetStyle.color, fontWeight: targetStyle.fontWeight}}>{data.target}</td>
                                                 <td style={{...cellStyle, backgroundColor: bgColor, color: actualStyle.color, fontWeight: actualStyle.fontWeight}}>{data.actual}</td>
-                                                <td style={{...cellStyle, backgroundColor: bgColor, color: diffStyle.color, fontWeight: diffStyle.fontWeight, ...thickDividerStyle}}>{data.diff}</td>
+                                                <td style={{...cellStyle, backgroundColor: bgColor, color: diffStyle.color, fontWeight: diffStyle.fontWeight, ...thickDividerStyle}}>{formatDiff(data.diff)}</td>
                                             </React.Fragment>
                                         )
                                     })}
                                     
-                                    {/* Total All (Hanya di mode Bulanan yg relevan secara horizontal, namun di Daily tetap tampil untuk rekap akumulasi bulanan tersebut) */}
+                                    {/* Total All Horizontal */}
                                     <td style={{...cellStyle, backgroundColor: '#f8fafc', fontWeight: '600'}}>{calculatedData.grandTotals[cat].b}</td>
                                     <td style={{...cellStyle, backgroundColor: '#f8fafc', fontWeight: '600'}}>{calculatedData.grandTotals[cat].a}</td>
-                                    <td style={{...cellStyle, backgroundColor: '#f8fafc', fontWeight: '600'}}>{calculatedData.grandTotals[cat].diff}</td>
+                                    <td style={{...cellStyle, backgroundColor: '#f8fafc', fontWeight: '600'}}>{formatDiff(calculatedData.grandTotals[cat].diff)}</td>
                                 </tr>
                             );
                         })}
@@ -715,20 +737,20 @@
                                                     <React.Fragment key={`total-${m}`}>
                                                         <td style={{...cellStyle, backgroundColor: colors.totalRowBg, color: colors.totalRowText, fontWeight: '700'}}>{calculatedData.monthlyVertTotals[m].target}</td>
                                                         <td style={{...cellStyle, backgroundColor: colors.totalRowBg, color: colors.totalRowText, fontWeight: '700'}}>{calculatedData.monthlyVertTotals[m].actual}</td>
-                                                        <td style={{...cellStyle, backgroundColor: colors.totalRowBg, color: colors.totalRowText, fontWeight: '700', ...thickRight}}>{calculatedData.monthlyVertTotals[m].diff}</td>
+                                                        <td style={{...cellStyle, backgroundColor: colors.totalRowBg, color: colors.totalRowText, fontWeight: '700', ...thickRight}}>{formatDiff(calculatedData.monthlyVertTotals[m].diff)}</td>
                                                     </React.Fragment>
                                                 ))
                                                 : getDaysArray(selectedMonth).map(d => (
                                                     <React.Fragment key={`totald-${d}`}>
                                                         <td style={{...cellStyle, backgroundColor: colors.totalRowBg, color: colors.totalRowText, fontWeight: '700'}}>{calculatedData.dailyVertTotals[d].target}</td>
                                                         <td style={{...cellStyle, backgroundColor: colors.totalRowBg, color: colors.totalRowText, fontWeight: '700'}}>{calculatedData.dailyVertTotals[d].actual}</td>
-                                                        <td style={{...cellStyle, backgroundColor: colors.totalRowBg, color: colors.totalRowText, fontWeight: '700', ...thickRight}}>{calculatedData.dailyVertTotals[d].diff}</td>
+                                                        <td style={{...cellStyle, backgroundColor: colors.totalRowBg, color: colors.totalRowText, fontWeight: '700', ...thickRight}}>{formatDiff(calculatedData.dailyVertTotals[d].diff)}</td>
                                                     </React.Fragment>
                                                 ))
                                             }
                                             <td style={{...cellStyle, backgroundColor: colors.totalAllBg, color: '#ffffff', fontWeight: '800', position:'sticky', right:'160px', zIndex:20}}>{calculatedData.finalGrandTotal.target}</td>
                                             <td style={{...cellStyle, backgroundColor: colors.totalAllBg, color: '#ffffff', fontWeight: '800', position:'sticky', right:'80px', zIndex:20}}>{calculatedData.finalGrandTotal.actual}</td>
-                                            <td style={{...cellStyle, backgroundColor: colors.totalAllBg, color: '#ffffff', fontWeight: '800', position:'sticky', right:0, zIndex:20}}>{calculatedData.finalGrandTotal.diff}</td>
+                                            <td style={{...cellStyle, backgroundColor: colors.totalAllBg, color: '#ffffff', fontWeight: '800', position:'sticky', right:0, zIndex:20}}>{formatDiff(calculatedData.finalGrandTotal.diff)}</td>
                                         </tr>
                                     </tbody>
                                 </table>

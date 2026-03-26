@@ -90,11 +90,26 @@
             return { color, fontWeight };
         };
 
+        // --- HELPER UNTUK TANGGAL DINAMIS ---
         const getDaysInMonth = (monthStr) => {
             if(!monthStr) return 30;
             const [mStr, yStr] = monthStr.split('-');
             const mMap = { 'Jan':0, 'Feb':1, 'Mar':2, 'Apr':3, 'May':4, 'Jun':5, 'Jul':6, 'Aug':7, 'Sep':8, 'Oct':9, 'Nov':10, 'Dec':11 };
             return new Date(2000 + parseInt(yStr), mMap[mStr] + 1, 0).getDate();
+        };
+
+        const getMonthRange = (monthStr) => {
+            if(!monthStr) return { start: 1, end: 30 };
+            const end = getDaysInMonth(monthStr);
+            let start = 1;
+            // Template khusus bulan Maret dimulai dari tanggal 25
+            if (monthStr === 'Mar-26') start = 25;
+            return { start, end };
+        };
+
+        const getDaysArray = (monthStr) => {
+            const { start, end } = getMonthRange(monthStr);
+            return Array.from({length: end - start + 1}, (_, i) => start + i);
         };
 
         const generateId = () => Math.random().toString(36).substr(2, 9);
@@ -104,10 +119,10 @@
             
             const [months, setMonths] = useState(defaultMonths);
             const [groups, setGroups] = useState(defaultGroups);
-            const [dailyData, setDailyData] = useState({}); // { 'Apr-26': { 1: { 'cat': {target:0, actual:0} } } }
+            const [dailyData, setDailyData] = useState({});
             
             const [selectedMonth, setSelectedMonth] = useState('Apr-26');
-            const [selectedDate, setSelectedDate] = useState(1);
+            const [selectedDate, setSelectedDate] = useState(() => getMonthRange('Apr-26').start);
             const [inputType, setInputType] = useState('actual');
             
             const [newMonthStr, setNewMonthStr] = useState('');
@@ -129,7 +144,6 @@
                         isLocalChange.current = false;
                         setMonths(data.months || defaultMonths);
                         
-                        // Migrasi Data Grup
                         let loadedGroups = defaultGroups;
                         if (data.categories) {
                             if (data.categories.length > 0 && typeof data.categories[0] === 'object') loadedGroups = data.categories;
@@ -138,18 +152,18 @@
                         setGroups(loadedGroups);
                         if(loadedGroups.length > 0) setSelectedGroupForCat(loadedGroups[0].id);
 
-                        // Migrasi Data Daily vs Data Lama
                         let loadedDaily = {};
                         if (data.actuals) {
                             const firstM = data.months[0];
                             const sampleData = data.actuals[firstM];
                             if (sampleData && typeof sampleData[Object.keys(sampleData)[0]] !== 'object') {
-                                // Format Lama (Migrasikan ke Tanggal 1)
+                                // Migrasi data lama
                                 data.months.forEach(m => {
-                                    loadedDaily[m] = { 1: {} };
+                                    const { start } = getMonthRange(m);
+                                    loadedDaily[m] = { [start]: {} };
                                     loadedGroups.forEach(g => {
                                         g.categories.forEach(c => {
-                                            loadedDaily[m][1][c] = {
+                                            loadedDaily[m][start][c] = {
                                                 target: data.budgets?.[m]?.[c] || 0,
                                                 actual: data.actuals?.[m]?.[c] || 0
                                             };
@@ -157,12 +171,15 @@
                                     });
                                 });
                             } else {
-                                loadedDaily = data.actuals; // Sudah format baru
+                                loadedDaily = data.actuals;
                             }
                         }
                         setDailyData(loadedDaily);
 
-                        if (data.months && data.months.length > 0 && !data.months.includes(selectedMonth)) setSelectedMonth(data.months[0]);
+                        if (data.months && data.months.length > 0 && !data.months.includes(selectedMonth)) {
+                            setSelectedMonth(data.months[0]);
+                            setSelectedDate(getMonthRange(data.months[0]).start);
+                        }
                         setSyncStatus('synced');
                     } else {
                         if (error && error.code === 'PGRST116') setSyncStatus('synced');
@@ -173,7 +190,6 @@
                         } else setSyncStatus('error');
                     }
 
-                    // Subscribe
                     const channel = supabaseClient.channel('schema-db-changes').on(
                         'postgres_changes', { event: '*', schema: 'public', table: 'karyawan_data', filter: 'id=eq.main_doc' },
                         (payload) => {
@@ -195,9 +211,7 @@
                 if (!isLocalChange.current) return;
                 setSyncStatus('saving');
                 const timeoutId = setTimeout(async () => {
-                    // Gunakan payload yg dimanipulasi agar tidak mengubah struktur DB Supabase
                     const payload = { id: 'main_doc', months: months, categories: groups, actuals: dailyData, budgets: {} };
-                    
                     localStorage.setItem('karyawan_data_local', JSON.stringify(payload));
                     try {
                         const { error } = await supabaseClient.from('karyawan_data').upsert(payload);
@@ -212,59 +226,61 @@
                 return () => clearTimeout(timeoutId);
             }, [months, groups, dailyData]);
 
-            // --- KALKULASI DATA ---
+            // --- LOGIKA KALKULASI DATA (TARGET MENGIKUTI SISA/DIFF HARI SEBELUMNYA) ---
             const calculatedData = useMemo(() => {
                 const calcDaily = {}; 
                 const calcMonthly = {};
-                const grandTotals = {}; // total vertical
-                let carryover = {};
-
+                const grandTotals = {}; 
+                
                 const allCats = groups.flatMap(g => g.categories);
-                allCats.forEach(cat => { grandTotals[cat] = { b: 0, a: 0, diff: 0 }; carryover[cat] = 0; });
+                allCats.forEach(cat => { grandTotals[cat] = { b: 0, a: 0, diff: 0 }; });
 
                 months.forEach(month => {
                     calcDaily[month] = {};
                     calcMonthly[month] = {};
                     allCats.forEach(cat => calcMonthly[month][cat] = { target: 0, actual: 0, diff: 0 });
 
-                    const daysCount = getDaysInMonth(month);
-                    for(let d = 1; d <= daysCount; d++) {
-                        calcDaily[month][d] = {};
-                        
-                        allCats.forEach(cat => {
-                            const target = dailyData[month]?.[d]?.[cat]?.target || 0;
-                            const inputActual = dailyData[month]?.[d]?.[cat]?.actual || 0;
-                            
-                            const effectiveInput = inputActual + carryover[cat];
-                            let actualRendered = effectiveInput;
-                            let diffRendered = target - actualRendered;
-                            let nextCarry = 0;
-
-                            if (diffRendered < 0) {
-                                actualRendered = target;
-                                nextCarry = Math.abs(diffRendered);
-                                diffRendered = 0;
-                            }
-                            carryover[cat] = nextCarry;
-
-                            calcDaily[month][d][cat] = { target, actual: actualRendered, diff: diffRendered };
-
-                            // Akumulasi ke Bulanan
-                            calcMonthly[month][cat].target += target;
-                            calcMonthly[month][cat].actual += actualRendered;
-                            calcMonthly[month][cat].diff += diffRendered;
-                        });
-                    }
+                    const { start, end } = getMonthRange(month);
                     
-                    // Akumulasi Bulanan ke Grand Total Horizontal
                     allCats.forEach(cat => {
+                        let currentTarget = 0;
+                        let monthlyActualSum = 0;
+
+                        for(let d = start; d <= end; d++) {
+                            if (!calcDaily[month][d]) calcDaily[month][d] = {};
+                            
+                            // Pada tanggal PERTAMA di bulan tersebut, Target diambil dari input awal
+                            if (d === start) {
+                                currentTarget = dailyData[month]?.[d]?.[cat]?.target || 0;
+                                calcMonthly[month][cat].target = currentTarget; // Target total bulanan
+                            }
+
+                            const actual = dailyData[month]?.[d]?.[cat]?.actual || 0;
+                            
+                            // Hitung Sisa (Diff)
+                            let diff = currentTarget - actual;
+                            // Cegah target menjadi minus (jika target sdh terpenuhi / actual berlebih)
+                            if (diff < 0) diff = 0; 
+
+                            calcDaily[month][d][cat] = { target: currentTarget, actual, diff };
+                            
+                            monthlyActualSum += actual;
+                            // Target untuk hari esok adalah SISA (Diff) dari hari ini
+                            currentTarget = diff; 
+                        }
+
+                        calcMonthly[month][cat].actual = monthlyActualSum;
+                        let mDiff = calcMonthly[month][cat].target - monthlyActualSum;
+                        if (mDiff < 0) mDiff = 0;
+                        calcMonthly[month][cat].diff = mDiff;
+
                         grandTotals[cat].b += calcMonthly[month][cat].target;
                         grandTotals[cat].a += calcMonthly[month][cat].actual;
                         grandTotals[cat].diff += calcMonthly[month][cat].diff;
                     });
                 });
 
-                // Total Vertikal per Bulan / per Hari
+                // Total Vertikal per Bulan
                 const monthlyVertTotals = {};
                 months.forEach(m => {
                     let tb=0, ta=0, tdiff=0;
@@ -272,14 +288,19 @@
                     monthlyVertTotals[m] = { target: tb, actual: ta, diff: tdiff };
                 });
 
+                // Total Vertikal per Hari (Jika mode Harian)
                 const dailyVertTotals = {};
                 if(viewMode === 'daily') {
-                    const dCount = getDaysInMonth(selectedMonth);
-                    for(let d=1; d<=dCount; d++){
+                    const daysArr = getDaysArray(selectedMonth);
+                    daysArr.forEach(d => {
                         let tb=0, ta=0, tdiff=0;
-                        allCats.forEach(c => { tb+=calcDaily[selectedMonth][d][c].target; ta+=calcDaily[selectedMonth][d][c].actual; tdiff+=calcDaily[selectedMonth][d][c].diff; });
+                        allCats.forEach(c => { 
+                            tb+=calcDaily[selectedMonth][d][c].target; 
+                            ta+=calcDaily[selectedMonth][d][c].actual; 
+                            tdiff+=calcDaily[selectedMonth][d][c].diff; 
+                        });
                         dailyVertTotals[d] = { target: tb, actual: ta, diff: tdiff };
-                    }
+                    });
                 }
 
                 let finalGb=0, finalGa=0, finalGdiff=0;
@@ -323,7 +344,10 @@
                         isLocalChange.current = true;
                         const newMonths = months.filter(m => m !== monthToDelete);
                         setMonths(newMonths);
-                        if (selectedMonth === monthToDelete) setSelectedMonth(newMonths[0]);
+                        if (selectedMonth === monthToDelete) {
+                            setSelectedMonth(newMonths[0]);
+                            setSelectedDate(getMonthRange(newMonths[0]).start);
+                        }
                     }
                 });
             };
@@ -367,9 +391,7 @@
                     const cleaned = newCat.trim().toUpperCase();
                     if(calculatedData.allCats.includes(cleaned)) { setMessageModal("Nama Kategori sudah digunakan!"); return; }
                     isLocalChange.current = true;
-                    // Update nama di groups
                     setGroups(prev => prev.map(g => g.id === groupId ? {...g, categories: g.categories.map(c => c === oldCat ? cleaned : c)} : g));
-                    // Update data di dailyData agar tidak hilang
                     setDailyData(prev => {
                         const next = JSON.parse(JSON.stringify(prev));
                         Object.keys(next).forEach(m => {
@@ -399,7 +421,8 @@
                     message: 'Reset semua data kembali ke pengaturan awal?',
                     onConfirm: () => {
                         isLocalChange.current = true;
-                        setMonths(defaultMonths); setGroups(defaultGroups); setDailyData({}); setSelectedMonth(defaultMonths[0]);
+                        setMonths(defaultMonths); setGroups(defaultGroups); setDailyData({}); 
+                        setSelectedMonth(defaultMonths[0]); setSelectedDate(getMonthRange(defaultMonths[0]).start);
                     }
                 });
             };
@@ -418,7 +441,6 @@
             const subHeaderStyle = { ...cellStyle, backgroundColor: colors.subHeaderBg, color: colors.subHeaderText, fontWeight: '600', fontSize: '0.8rem' };
             const totalAllHeaderStyle = { ...headerStyle, backgroundColor: colors.totalAllBg };
 
-            // Render Table Rows berdasarkan Grup & Kategori
             const renderTableBody = (dataSource, getColData, thickDividerStyle) => {
                 let globalIndex = 1;
                 return groups.map((group, gIdx) => (
@@ -438,11 +460,11 @@
                                             </div>
                                         </div>
                                     </td>}
-                                    {isFirst && <td rowSpan={group.categories.length} className="sticky-col-2 bg-slate-100 text-center font-bold tracking-wide" style={{...cellStyle, verticalAlign: 'middle', borderRight: '1px solid #cbd5e1', left:'60px', zIndex:10}}>
+                                    {isFirst && <td rowSpan={group.categories.length} className="sticky-col-2 bg-slate-100 text-center font-bold tracking-wide" style={{...cellStyle, verticalAlign: 'middle', borderRight: '1px solid #cbd5e1', left:'45px', zIndex:10}}>
                                         <span style={{writingMode: 'vertical-rl', transform: 'rotate(180deg)'}} className="py-2 text-indigo-800">{group.name}</span>
                                     </td>}
                                     
-                                    <td className="sticky-col-3 bg-white text-left font-medium" style={{...cellStyle, left:'105px', zIndex:10, backgroundColor: bgColor}}>
+                                    <td className="sticky-col-3 bg-white text-left font-medium" style={{...cellStyle, left:'100px', zIndex:10, backgroundColor: bgColor}}>
                                         <div className="flex justify-between items-center w-[180px]">
                                             <span className="truncate">{cat}</span>
                                             <div className="flex gap-1 text-slate-300">
@@ -454,7 +476,7 @@
                                     
                                     {isFirst && <td style={{...cellStyle, backgroundColor: colors.rowEven, textAlign: 'left', color: colors.subHeaderText, ...thickDividerStyle}}>Requirement</td>}
                                     {cIdx === 1 && <td rowSpan={Math.max(1, group.categories.length - 1)} style={{...cellStyle, backgroundColor: colors.rowEven, textAlign: 'left', color: colors.subHeaderText, verticalAlign: 'middle', ...thickDividerStyle}}>Target</td>}
-                                    {cIdx > 1 && group.categories.length === 1 && <td style={{...cellStyle, ...thickDividerStyle}}></td>} {/* Fallback if only 1 cat */}
+                                    {cIdx > 1 && group.categories.length === 1 && <td style={{...cellStyle, ...thickDividerStyle}}></td>} 
                                     
                                     {dataSource.map(colId => {
                                         const data = getColData(colId, cat);
@@ -470,7 +492,7 @@
                                         )
                                     })}
                                     
-                                    {/* Total All */}
+                                    {/* Total All (Hanya di mode Bulanan yg relevan secara horizontal, namun di Daily tetap tampil untuk rekap akumulasi bulanan tersebut) */}
                                     <td style={{...cellStyle, backgroundColor: '#f8fafc', fontWeight: '600'}}>{calculatedData.grandTotals[cat].b}</td>
                                     <td style={{...cellStyle, backgroundColor: '#f8fafc', fontWeight: '600'}}>{calculatedData.grandTotals[cat].a}</td>
                                     <td style={{...cellStyle, backgroundColor: '#f8fafc', fontWeight: '600'}}>{calculatedData.grandTotals[cat].diff}</td>
@@ -522,10 +544,10 @@
                             {/* TABS VIEW MODE */}
                             <div className="flex bg-slate-100 p-1.5 rounded-xl border border-slate-200">
                                 <button onClick={() => setViewMode('monthly')} className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all ${viewMode === 'monthly' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-                                    <IconBarChart /> Tampilan Bulanan (Summary)
+                                    <IconBarChart /> Bulanan (Summary)
                                 </button>
                                 <button onClick={() => setViewMode('daily')} className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all ${viewMode === 'daily' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-                                    <IconCalendar /> Tampilan Harian (Input)
+                                    <IconCalendar /> Harian (Input)
                                 </button>
                             </div>
                         </div>
@@ -542,21 +564,34 @@
                                         <div className="grid grid-cols-3 gap-3 mb-5">
                                             <div>
                                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Bulan</label>
-                                                <select value={selectedMonth} onChange={(e) => {setSelectedMonth(e.target.value); setSelectedDate(1);}} className="w-full bg-slate-50 border border-slate-200 py-2 px-2 rounded-lg outline-none font-semibold text-sm">
+                                                <select value={selectedMonth} onChange={(e) => {
+                                                    const newM = e.target.value;
+                                                    setSelectedMonth(newM); 
+                                                    setSelectedDate(getMonthRange(newM).start);
+                                                    setInputType('actual');
+                                                }} className="w-full bg-slate-50 border border-slate-200 py-2 px-2 rounded-lg outline-none font-semibold text-sm cursor-pointer">
                                                     {months.map(m => <option key={m} value={m}>{m}</option>)}
                                                 </select>
                                             </div>
                                             <div>
                                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Tanggal</label>
-                                                <select value={selectedDate} onChange={(e) => setSelectedDate(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 py-2 px-2 rounded-lg outline-none font-semibold text-sm">
-                                                    {Array.from({length: getDaysInMonth(selectedMonth)}, (_, i) => i + 1).map(d => <option key={d} value={d}>Tgl {d}</option>)}
+                                                <select value={selectedDate} onChange={(e) => {
+                                                    const newD = Number(e.target.value);
+                                                    setSelectedDate(newD);
+                                                    // Hanya izinkan input Target di tanggal awal bulan tersebut
+                                                    if(newD !== getMonthRange(selectedMonth).start) setInputType('actual');
+                                                }} className="w-full bg-slate-50 border border-slate-200 py-2 px-2 rounded-lg outline-none font-semibold text-sm cursor-pointer">
+                                                    {getDaysArray(selectedMonth).map(d => <option key={d} value={d}>Tgl {d}</option>)}
                                                 </select>
                                             </div>
                                             <div>
-                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Input</label>
-                                                <select value={inputType} onChange={(e) => setInputType(e.target.value)} className="w-full bg-indigo-50 border border-indigo-200 text-indigo-700 py-2 px-2 rounded-lg outline-none font-bold text-sm">
+                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Mode Input</label>
+                                                <select value={inputType} onChange={(e) => setInputType(e.target.value)} className="w-full bg-indigo-50 border border-indigo-200 text-indigo-700 py-2 px-2 rounded-lg outline-none font-bold text-sm cursor-pointer">
                                                     <option value="actual">Aktual</option>
-                                                    <option value="target">Target</option>
+                                                    {/* Pilihan Target hanya dimunculkan saat memilih tanggal pertama bulan tsb */}
+                                                    {selectedDate === getMonthRange(selectedMonth).start && (
+                                                        <option value="target">Target (Awal)</option>
+                                                    )}
                                                 </select>
                                             </div>
                                         </div>
@@ -635,12 +670,12 @@
                                         <tr>
                                             <th style={{...headerStyle, width:'45px', left:0, zIndex:30}} rowSpan="2" className="sticky-col">NO</th>
                                             <th style={{...headerStyle, width:'20px', left:'45px', zIndex:30}} rowSpan="2" className="sticky-col-2">GRUP</th>
-                                            <th style={{...headerStyle, left:'105px', zIndex:30}} rowSpan="2" className="sticky-col-3 w-48 text-left">EMPLOYEE CATEGORIES</th>
+                                            <th style={{...headerStyle, left:'100px', zIndex:30}} rowSpan="2" className="sticky-col-3 w-48 text-left">EMPLOYEE CATEGORIES</th>
                                             <th style={{...headerStyle, ...thickRight}} rowSpan="2" className="w-24 text-left">DETAIL</th>
                                             
                                             {viewMode === 'monthly' 
                                                 ? months.map(m => <th key={m} colSpan="3" style={{...headerStyle, ...thickRight}}>{m}</th>)
-                                                : Array.from({length: getDaysInMonth(selectedMonth)}, (_, i) => i + 1).map(d => <th key={d} colSpan="3" style={{...headerStyle, ...thickRight}}>Tgl {d}</th>)
+                                                : getDaysArray(selectedMonth).map(d => <th key={d} colSpan="3" style={{...headerStyle, ...thickRight}}>Tgl {d}</th>)
                                             }
                                             <th colSpan="3" style={{...totalAllHeaderStyle, position:'sticky', right:0, zIndex:30}}>TOTAL ALL</th>
                                         </tr>
@@ -653,7 +688,7 @@
                                                         <th style={{...subHeaderStyle, ...thickRight}} className="w-20">Diff</th>
                                                     </React.Fragment>
                                                 ))
-                                                : Array.from({length: getDaysInMonth(selectedMonth)}, (_, i) => i + 1).map(d => (
+                                                : getDaysArray(selectedMonth).map(d => (
                                                     <React.Fragment key={`subd-${d}`}>
                                                         <th style={subHeaderStyle} className="w-16">Tgt</th>
                                                         <th style={subHeaderStyle} className="w-16">Act</th>
@@ -669,7 +704,7 @@
                                     <tbody>
                                         {viewMode === 'monthly' 
                                             ? renderTableBody(months, (m, cat) => calculatedData.calcMonthly[m][cat], thickRight)
-                                            : renderTableBody(Array.from({length: getDaysInMonth(selectedMonth)}, (_, i) => i + 1), (d, cat) => calculatedData.calcDaily[selectedMonth][d][cat], thickRight)
+                                            : renderTableBody(getDaysArray(selectedMonth), (d, cat) => calculatedData.calcDaily[selectedMonth][d][cat], thickRight)
                                         }
                                         
                                         {/* Baris GRAND TOTAL Terbawah */}
@@ -683,7 +718,7 @@
                                                         <td style={{...cellStyle, backgroundColor: colors.totalRowBg, color: colors.totalRowText, fontWeight: '700', ...thickRight}}>{calculatedData.monthlyVertTotals[m].diff}</td>
                                                     </React.Fragment>
                                                 ))
-                                                : Array.from({length: getDaysInMonth(selectedMonth)}, (_, i) => i + 1).map(d => (
+                                                : getDaysArray(selectedMonth).map(d => (
                                                     <React.Fragment key={`totald-${d}`}>
                                                         <td style={{...cellStyle, backgroundColor: colors.totalRowBg, color: colors.totalRowText, fontWeight: '700'}}>{calculatedData.dailyVertTotals[d].target}</td>
                                                         <td style={{...cellStyle, backgroundColor: colors.totalRowBg, color: colors.totalRowText, fontWeight: '700'}}>{calculatedData.dailyVertTotals[d].actual}</td>

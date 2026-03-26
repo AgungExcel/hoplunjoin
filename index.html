@@ -151,6 +151,7 @@
             
             const [syncStatus, setSyncStatus] = useState('connecting'); 
             const isLocalChange = useRef(false);
+            const tableContainerRef = useRef(null); // Ref untuk menargetkan kontainer tabel
 
             useEffect(() => {
                 const fetchAndSubscribe = async () => {
@@ -378,6 +379,21 @@
 
                 return { calcDaily, calcMonthly, grandTotals, monthlyVertTotals, dailyVertTotals, finalGrandTotal, allCats };
             }, [months, groups, dailyData, viewMode, selectedMonth]);
+
+            // --- EFEK AUTO-SCROLL KE TANGGAL YANG DIPILIH ---
+            useEffect(() => {
+                if (viewMode === 'daily' && tableContainerRef.current) {
+                    const targetCol = document.getElementById(`col-date-${selectedDate}`);
+                    if (targetCol) {
+                        // Menggeser dikurangi 300px agar tidak tertutup oleh kolom sticky (No, Grup, Kategori) di kiri
+                        const stickyOffset = 300; 
+                        tableContainerRef.current.scrollTo({
+                            left: targetCol.offsetLeft - stickyOffset,
+                            behavior: 'smooth'
+                        });
+                    }
+                }
+            }, [selectedDate, viewMode]);
 
             // --- FUNGSI UBAH NAMA ---
             const handleRenameUser = async () => {
@@ -768,7 +784,7 @@
 
                         {/* TABEL OUTPUT */}
                         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden w-full relative">
-                            <div className="overflow-x-auto p-0 m-0 hide-scroll" style={{ WebkitOverflowScrolling: 'touch', maxHeight: '70vh' }}>
+                            <div className="overflow-x-auto p-0 m-0 hide-scroll" ref={tableContainerRef} style={{ WebkitOverflowScrolling: 'touch', maxHeight: '70vh' }}>
                                 <table id="dataTable" className="border-collapse min-w-max text-center relative" style={{ border: `1px solid ${colors.border}` }}>
                                     <thead className="sticky top-0 z-30">
                                         <tr>
@@ -779,7 +795,7 @@
                                             
                                             {viewMode === 'monthly' 
                                                 ? months.map(m => <th key={m} colSpan="3" style={{...headerStyle, ...thickRight}}>{m}</th>)
-                                                : getDaysArray(selectedMonth).map(d => <th key={d} colSpan="3" style={{...headerStyle, ...thickRight}}>Tgl {d}</th>)
+                                                : getDaysArray(selectedMonth).map(d => <th key={d} id={`col-date-${d}`} colSpan="3" style={{...headerStyle, ...thickRight}}>Tgl {d}</th>)
                                             }
                                             <th colSpan="3" style={{...totalAllHeaderStyle, position:'sticky', right:0, zIndex:30}}>TOTAL ALL</th>
                                         </tr>

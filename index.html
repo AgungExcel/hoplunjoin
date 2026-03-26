@@ -12,23 +12,28 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Tailwind Config untuk Font Custom -->
     <script>
         tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: { sans: ['Inter', 'sans-serif'] }
-                }
-            }
+            theme: { extend: { fontFamily: { sans: ['Inter', 'sans-serif'] } } }
         }
     </script>
     <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <!-- Babel untuk menerjemahkan JSX di browser -->
+    <!-- Babel untuk menerjemahkan JSX -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <!-- Supabase JS Client -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        /* Custom Sticky Scrollbar */
+        .sticky-col { position: sticky; left: 0; z-index: 20; }
+        .sticky-col-2 { position: sticky; left: 45px; z-index: 20; }
+        .sticky-col-3 { position: sticky; left: 245px; z-index: 20; }
+        .hide-scroll::-webkit-scrollbar { height: 8px; }
+        .hide-scroll::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
+        .hide-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .hide-scroll::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
 </head>
 <body class="bg-slate-50 text-slate-800 antialiased selection:bg-indigo-100 selection:text-indigo-900">
     <div id="root"></div>
@@ -42,6 +47,9 @@
         const IconDownload = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>;
         const IconPlus = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>;
         const IconX = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>;
+        const IconEdit = () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>;
+        const IconCalendar = () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>;
+        const IconBarChart = () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>;
 
         // Supabase Setup
         const supabaseUrl = 'https://slqolbmmcwanrljaaddw.supabase.co';
@@ -49,72 +57,63 @@
         const supabaseClient = createClient(supabaseUrl, supabaseKey);
 
         const defaultMonths = ['Mar-26', 'Apr-26', 'May-26', 'Jun-26'];
-        const defaultCategories = ['DIRECT SEWER', 'EXPERIENCE', 'VOCATIONAL SCHOOL GRADUATE'];
-        const defaultBudgets = {
-            'Mar-26': { 'DIRECT SEWER': 0, 'EXPERIENCE': 0, 'VOCATIONAL SCHOOL GRADUATE': 0 },
-            'Apr-26': { 'DIRECT SEWER': 0, 'EXPERIENCE': 80, 'VOCATIONAL SCHOOL GRADUATE': 120 },
-            'May-26': { 'DIRECT SEWER': 0, 'EXPERIENCE': 80, 'VOCATIONAL SCHOOL GRADUATE': 120 },
-            'Jun-26': { 'DIRECT SEWER': 0, 'EXPERIENCE': 80, 'VOCATIONAL SCHOOL GRADUATE': 120 }
-        };
-        const defaultActuals = {
-            'Mar-26': { 'DIRECT SEWER': 0, 'EXPERIENCE': 0, 'VOCATIONAL SCHOOL GRADUATE': 0 },
-            'Apr-26': { 'DIRECT SEWER': 70, 'EXPERIENCE': 85, 'VOCATIONAL SCHOOL GRADUATE': 100 },
-            'May-26': { 'DIRECT SEWER': 0, 'EXPERIENCE': 0, 'VOCATIONAL SCHOOL GRADUATE': 0 },
-            'Jun-26': { 'DIRECT SEWER': 0, 'EXPERIENCE': 0, 'VOCATIONAL SCHOOL GRADUATE': 0 }
-        };
+        const defaultGroups = [
+            { id: 'g1', name: 'EMPLOYEE CATEGORIES', categories: ['DIRECT SEWER', 'EXPERIENCE', 'VOCATIONAL SCHOOL GRADUATE'] }
+        ];
 
-        // --- Palet Warna Inline (untuk export Excel) ---
+        // --- Palet Warna Inline ---
         const colors = {
-            headerBg: '#1e293b',     // Slate-800
-            headerText: '#ffffff',   // White
-            totalAllBg: '#4f46e5',   // Indigo-600
-            totalAllText: '#ffffff', // White
-            subHeaderBg: '#f1f5f9',  // Slate-100
-            subHeaderText: '#334155',// Slate-700
-            rowEven: '#ffffff',      // White
-            rowOdd: '#f8fafc',       // Slate-50
-            totalRowBg: '#e0e7ff',   // Indigo-100
-            totalRowText: '#3730a3', // Indigo-800
-            border: '#cbd5e1',       // Slate-300
-            thickBorder: '#475569',  // Slate-600 (Garis tebal)
-            textNormal: '#1e293b',   // Slate-800
-            textRed: '#dc2626',      // Red-600
-            textGreen: '#16a34a'     // Green-600
+            headerBg: '#1e293b', headerText: '#ffffff',
+            totalAllBg: '#4f46e5', totalAllText: '#ffffff',
+            subHeaderBg: '#f1f5f9', subHeaderText: '#334155',
+            rowEven: '#ffffff', rowOdd: '#f8fafc',
+            totalRowBg: '#e0e7ff', totalRowText: '#3730a3',
+            border: '#cbd5e1', thickBorder: '#475569',
+            textNormal: '#1e293b', textRed: '#dc2626', textGreen: '#16a34a'
         };
 
         const thickRight = { borderRight: `3px solid ${colors.thickBorder}` };
 
-        // Helper untuk mewarnai angka secara kondisional
-        const getNumberStyle = (actual, budget, isBalance = false) => {
-            const balance = budget - actual;
+        // Helper Format Warna
+        const getNumberStyle = (actual, target, isBalance = false) => {
+            const different = target - actual;
             let color = colors.textNormal;
             let fontWeight = 'normal';
 
-            if (budget > 0) {
-                if (balance > 0) {
-                    // Actual < Budget (Ada kekurangan / defisit)
-                    color = colors.textRed;
-                    fontWeight = 'bold';
-                } else if (balance === 0) {
-                    // Actual == Budget (Target terpenuhi pas)
-                    color = colors.textGreen;
-                    fontWeight = 'bold';
+            if (target > 0) {
+                if (different > 0) {
+                    color = colors.textRed; fontWeight = 'bold'; // Defisit (Merah)
+                } else if (different === 0) {
+                    color = colors.textGreen; fontWeight = 'bold'; // Pas Target (Hijau)
                 }
             }
-            
             return { color, fontWeight };
         };
 
+        const getDaysInMonth = (monthStr) => {
+            if(!monthStr) return 30;
+            const [mStr, yStr] = monthStr.split('-');
+            const mMap = { 'Jan':0, 'Feb':1, 'Mar':2, 'Apr':3, 'May':4, 'Jun':5, 'Jul':6, 'Aug':7, 'Sep':8, 'Oct':9, 'Nov':10, 'Dec':11 };
+            return new Date(2000 + parseInt(yStr), mMap[mStr] + 1, 0).getDate();
+        };
+
+        const generateId = () => Math.random().toString(36).substr(2, 9);
+
         function App() {
+            const [viewMode, setViewMode] = useState('monthly'); // 'monthly' | 'daily'
+            
             const [months, setMonths] = useState(defaultMonths);
-            const [categories, setCategories] = useState(defaultCategories);
-            const [budgets, setBudgets] = useState(defaultBudgets);
-            const [actuals, setActuals] = useState(defaultActuals);
+            const [groups, setGroups] = useState(defaultGroups);
+            const [dailyData, setDailyData] = useState({}); // { 'Apr-26': { 1: { 'cat': {target:0, actual:0} } } }
             
             const [selectedMonth, setSelectedMonth] = useState('Apr-26');
+            const [selectedDate, setSelectedDate] = useState(1);
             const [inputType, setInputType] = useState('actual');
+            
             const [newMonthStr, setNewMonthStr] = useState('');
+            const [newGroupStr, setNewGroupStr] = useState('');
             const [newCategoryStr, setNewCategoryStr] = useState('');
+            const [selectedGroupForCat, setSelectedGroupForCat] = useState('g1');
 
             const [messageModal, setMessageModal] = useState('');
             const [confirmModal, setConfirmModal] = useState(null);
@@ -129,9 +128,40 @@
                     if (data) {
                         isLocalChange.current = false;
                         setMonths(data.months || defaultMonths);
-                        setCategories(data.categories || defaultCategories);
-                        setBudgets(data.budgets || defaultBudgets);
-                        setActuals(data.actuals || defaultActuals);
+                        
+                        // Migrasi Data Grup
+                        let loadedGroups = defaultGroups;
+                        if (data.categories) {
+                            if (data.categories.length > 0 && typeof data.categories[0] === 'object') loadedGroups = data.categories;
+                            else loadedGroups = [{ id: 'g1', name: 'EMPLOYEE CATEGORIES', categories: data.categories }];
+                        }
+                        setGroups(loadedGroups);
+                        if(loadedGroups.length > 0) setSelectedGroupForCat(loadedGroups[0].id);
+
+                        // Migrasi Data Daily vs Data Lama
+                        let loadedDaily = {};
+                        if (data.actuals) {
+                            const firstM = data.months[0];
+                            const sampleData = data.actuals[firstM];
+                            if (sampleData && typeof sampleData[Object.keys(sampleData)[0]] !== 'object') {
+                                // Format Lama (Migrasikan ke Tanggal 1)
+                                data.months.forEach(m => {
+                                    loadedDaily[m] = { 1: {} };
+                                    loadedGroups.forEach(g => {
+                                        g.categories.forEach(c => {
+                                            loadedDaily[m][1][c] = {
+                                                target: data.budgets?.[m]?.[c] || 0,
+                                                actual: data.actuals?.[m]?.[c] || 0
+                                            };
+                                        });
+                                    });
+                                });
+                            } else {
+                                loadedDaily = data.actuals; // Sudah format baru
+                            }
+                        }
+                        setDailyData(loadedDaily);
+
                         if (data.months && data.months.length > 0 && !data.months.includes(selectedMonth)) setSelectedMonth(data.months[0]);
                         setSyncStatus('synced');
                     } else {
@@ -139,19 +169,19 @@
                         else if (error && error.code === 'PGRST205') {
                             console.warn("Tabel belum dibuat di Supabase.");
                             setSyncStatus('error');
-                            setMessageModal('PENTING: Tabel "karyawan_data" belum ada di Supabase. Anda harus membuat tabel terlebih dahulu di Dashboard Supabase Anda.');
+                            setMessageModal('PENTING: Tabel "karyawan_data" belum ada di Supabase. Buat melalui SQL Editor.');
                         } else setSyncStatus('error');
                     }
 
+                    // Subscribe
                     const channel = supabaseClient.channel('schema-db-changes').on(
                         'postgres_changes', { event: '*', schema: 'public', table: 'karyawan_data', filter: 'id=eq.main_doc' },
                         (payload) => {
                             if (payload.new) {
                                 isLocalChange.current = false;
                                 setMonths(payload.new.months || defaultMonths);
-                                setCategories(payload.new.categories || defaultCategories);
-                                setBudgets(payload.new.budgets || defaultBudgets);
-                                setActuals(payload.new.actuals || defaultActuals);
+                                setGroups(payload.new.categories || defaultGroups);
+                                setDailyData(payload.new.actuals || {});
                             }
                         }
                     ).subscribe();
@@ -165,9 +195,12 @@
                 if (!isLocalChange.current) return;
                 setSyncStatus('saving');
                 const timeoutId = setTimeout(async () => {
-                    localStorage.setItem('karyawan_data_local', JSON.stringify({ months, categories, budgets, actuals }));
+                    // Gunakan payload yg dimanipulasi agar tidak mengubah struktur DB Supabase
+                    const payload = { id: 'main_doc', months: months, categories: groups, actuals: dailyData, budgets: {} };
+                    
+                    localStorage.setItem('karyawan_data_local', JSON.stringify(payload));
                     try {
-                        const { error } = await supabaseClient.from('karyawan_data').upsert({ id: 'main_doc', months, categories, budgets, actuals });
+                        const { error } = await supabaseClient.from('karyawan_data').upsert(payload);
                         if (error) throw error;
                         setSyncStatus('synced');
                         isLocalChange.current = false;
@@ -177,68 +210,115 @@
                     }
                 }, 800);
                 return () => clearTimeout(timeoutId);
-            }, [months, categories, budgets, actuals]);
+            }, [months, groups, dailyData]);
 
+            // --- KALKULASI DATA ---
             const calculatedData = useMemo(() => {
-                const calc = {}; const totals = {}; let carryover = {};
-                categories.forEach(cat => { totals[cat] = { b: 0, a: 0, bal: 0 }; carryover[cat] = 0; });
+                const calcDaily = {}; 
+                const calcMonthly = {};
+                const grandTotals = {}; // total vertical
+                let carryover = {};
+
+                const allCats = groups.flatMap(g => g.categories);
+                allCats.forEach(cat => { grandTotals[cat] = { b: 0, a: 0, diff: 0 }; carryover[cat] = 0; });
 
                 months.forEach(month => {
-                    calc[month] = {};
-                    categories.forEach(cat => {
-                        const budget = budgets[month]?.[cat] || 0;
-                        const inputActual = actuals[month]?.[cat] || 0;
-                        const effectiveInput = inputActual + carryover[cat];
-                        let actualRendered = effectiveInput;
-                        let balanceRendered = budget - actualRendered;
-                        let nextCarry = 0;
+                    calcDaily[month] = {};
+                    calcMonthly[month] = {};
+                    allCats.forEach(cat => calcMonthly[month][cat] = { target: 0, actual: 0, diff: 0 });
 
-                        if (balanceRendered < 0) {
-                            actualRendered = budget;
-                            nextCarry = Math.abs(balanceRendered);
-                            balanceRendered = 0;
-                        }
+                    const daysCount = getDaysInMonth(month);
+                    for(let d = 1; d <= daysCount; d++) {
+                        calcDaily[month][d] = {};
+                        
+                        allCats.forEach(cat => {
+                            const target = dailyData[month]?.[d]?.[cat]?.target || 0;
+                            const inputActual = dailyData[month]?.[d]?.[cat]?.actual || 0;
+                            
+                            const effectiveInput = inputActual + carryover[cat];
+                            let actualRendered = effectiveInput;
+                            let diffRendered = target - actualRendered;
+                            let nextCarry = 0;
 
-                        calc[month][cat] = { budget, actual: actualRendered, balance: balanceRendered };
-                        carryover[cat] = nextCarry;
+                            if (diffRendered < 0) {
+                                actualRendered = target;
+                                nextCarry = Math.abs(diffRendered);
+                                diffRendered = 0;
+                            }
+                            carryover[cat] = nextCarry;
 
-                        totals[cat].b += budget; totals[cat].a += actualRendered; totals[cat].bal += balanceRendered;
+                            calcDaily[month][d][cat] = { target, actual: actualRendered, diff: diffRendered };
+
+                            // Akumulasi ke Bulanan
+                            calcMonthly[month][cat].target += target;
+                            calcMonthly[month][cat].actual += actualRendered;
+                            calcMonthly[month][cat].diff += diffRendered;
+                        });
+                    }
+                    
+                    // Akumulasi Bulanan ke Grand Total Horizontal
+                    allCats.forEach(cat => {
+                        grandTotals[cat].b += calcMonthly[month][cat].target;
+                        grandTotals[cat].a += calcMonthly[month][cat].actual;
+                        grandTotals[cat].diff += calcMonthly[month][cat].diff;
                     });
                 });
 
-                const monthlyTotals = {};
-                months.forEach(month => {
-                    let b = 0, a = 0, bal = 0;
-                    categories.forEach(cat => { b += calc[month][cat].budget; a += calc[month][cat].actual; bal += calc[month][cat].balance; });
-                    monthlyTotals[month] = { budget: b, actual: a, balance: bal };
+                // Total Vertikal per Bulan / per Hari
+                const monthlyVertTotals = {};
+                months.forEach(m => {
+                    let tb=0, ta=0, tdiff=0;
+                    allCats.forEach(c => { tb+=calcMonthly[m][c].target; ta+=calcMonthly[m][c].actual; tdiff+=calcMonthly[m][c].diff; });
+                    monthlyVertTotals[m] = { target: tb, actual: ta, diff: tdiff };
                 });
 
-                let gb = 0, ga = 0, gbal = 0;
-                categories.forEach(cat => { gb += totals[cat].b; ga += totals[cat].a; gbal += totals[cat].bal; });
-                const grandTotal = { budget: gb, actual: ga, balance: gbal };
+                const dailyVertTotals = {};
+                if(viewMode === 'daily') {
+                    const dCount = getDaysInMonth(selectedMonth);
+                    for(let d=1; d<=dCount; d++){
+                        let tb=0, ta=0, tdiff=0;
+                        allCats.forEach(c => { tb+=calcDaily[selectedMonth][d][c].target; ta+=calcDaily[selectedMonth][d][c].actual; tdiff+=calcDaily[selectedMonth][d][c].diff; });
+                        dailyVertTotals[d] = { target: tb, actual: ta, diff: tdiff };
+                    }
+                }
 
-                return { calc, totals, monthlyTotals, grandTotal };
-            }, [months, categories, budgets, actuals]);
+                let finalGb=0, finalGa=0, finalGdiff=0;
+                allCats.forEach(c => { finalGb+=grandTotals[c].b; finalGa+=grandTotals[c].a; finalGdiff+=grandTotals[c].diff; });
+                const finalGrandTotal = { target: finalGb, actual: finalGa, diff: finalGdiff };
 
-            const handleInputChange = (field, value) => {
+                return { calcDaily, calcMonthly, grandTotals, monthlyVertTotals, dailyVertTotals, finalGrandTotal, allCats };
+            }, [months, groups, dailyData, viewMode, selectedMonth]);
+
+            // --- HANDLERS ---
+            const handleInputChange = (cat, value) => {
                 isLocalChange.current = true;
                 const numValue = value === '' ? '' : Number(value);
-                if (inputType === 'actual') setActuals(prev => ({ ...prev, [selectedMonth]: { ...prev[selectedMonth], [field]: numValue } }));
-                else setBudgets(prev => ({ ...prev, [selectedMonth]: { ...prev[selectedMonth], [field]: numValue } }));
+                setDailyData(prev => ({
+                    ...prev,
+                    [selectedMonth]: {
+                        ...prev[selectedMonth],
+                        [selectedDate]: {
+                            ...(prev[selectedMonth]?.[selectedDate] || {}),
+                            [cat]: {
+                                ...(prev[selectedMonth]?.[selectedDate]?.[cat] || { target:0, actual:0 }),
+                                [inputType]: numValue
+                            }
+                        }
+                    }
+                }));
             };
 
             const handleAddMonth = () => {
                 if (!newMonthStr.trim() || months.includes(newMonthStr.trim())) return;
                 isLocalChange.current = true;
-                const newM = newMonthStr.trim();
-                setMonths(prev => [...prev, newM]); setBudgets(prev => ({ ...prev, [newM]: {} })); setActuals(prev => ({ ...prev, [newM]: {} }));
-                setNewMonthStr(''); setSelectedMonth(newM);
+                setMonths(prev => [...prev, newMonthStr.trim()]);
+                setNewMonthStr('');
             };
 
             const handleDeleteMonth = (monthToDelete) => {
-                if (months.length <= 1) { setMessageModal('Gagal: Minimal harus ada 1 bulan tersisa!'); return; }
+                if (months.length <= 1) { setMessageModal('Minimal harus ada 1 bulan tersisa!'); return; }
                 setConfirmModal({
-                    message: `Yakin ingin menghapus kolom bulan ${monthToDelete}?`,
+                    message: `Yakin hapus kolom bulan ${monthToDelete}?`,
                     onConfirm: () => {
                         isLocalChange.current = true;
                         const newMonths = months.filter(m => m !== monthToDelete);
@@ -248,18 +328,69 @@
                 });
             };
 
-            const handleAddCategory = () => {
-                const newCat = newCategoryStr.trim().toUpperCase();
-                if (!newCat || categories.includes(newCat)) return;
+            const handleAddGroup = () => {
+                if(!newGroupStr.trim()) return;
                 isLocalChange.current = true;
-                setCategories(prev => [...prev, newCat]); setNewCategoryStr('');
+                const newG = { id: generateId(), name: newGroupStr.trim().toUpperCase(), categories: [] };
+                setGroups(prev => [...prev, newG]);
+                setNewGroupStr('');
+                setSelectedGroupForCat(newG.id);
             };
 
-            const handleDeleteCategory = (catToDelete) => {
-                if (categories.length <= 1) { setMessageModal('Gagal: Minimal harus ada 1 kategori baris tersisa!'); return; }
+            const handleRenameGroup = (groupId, oldName) => {
+                const newName = window.prompt("Ubah nama Grup:", oldName);
+                if(newName && newName.trim() !== oldName) {
+                    isLocalChange.current = true;
+                    setGroups(prev => prev.map(g => g.id === groupId ? {...g, name: newName.trim().toUpperCase()} : g));
+                }
+            };
+
+            const handleDeleteGroup = (groupId, name) => {
+                if(groups.length <= 1) { setMessageModal('Minimal harus ada 1 Grup tersisa!'); return; }
                 setConfirmModal({
-                    message: `Yakin ingin menghapus baris kategori ${catToDelete}?`,
-                    onConfirm: () => { isLocalChange.current = true; setCategories(categories.filter(c => c !== catToDelete)); }
+                    message: `Hapus grup ${name} beserta isinya?`,
+                    onConfirm: () => { isLocalChange.current = true; setGroups(prev => prev.filter(g => g.id !== groupId)); }
+                });
+            };
+
+            const handleAddCategory = () => {
+                const catName = newCategoryStr.trim().toUpperCase();
+                if (!catName || calculatedData.allCats.includes(catName)) { setMessageModal("Kategori sudah ada atau kosong!"); return; }
+                isLocalChange.current = true;
+                setGroups(prev => prev.map(g => g.id === selectedGroupForCat ? {...g, categories: [...g.categories, catName]} : g));
+                setNewCategoryStr('');
+            };
+
+            const handleRenameCategory = (groupId, oldCat) => {
+                const newCat = window.prompt("Ubah nama Kategori:", oldCat);
+                if(newCat && newCat.trim() !== oldCat) {
+                    const cleaned = newCat.trim().toUpperCase();
+                    if(calculatedData.allCats.includes(cleaned)) { setMessageModal("Nama Kategori sudah digunakan!"); return; }
+                    isLocalChange.current = true;
+                    // Update nama di groups
+                    setGroups(prev => prev.map(g => g.id === groupId ? {...g, categories: g.categories.map(c => c === oldCat ? cleaned : c)} : g));
+                    // Update data di dailyData agar tidak hilang
+                    setDailyData(prev => {
+                        const next = JSON.parse(JSON.stringify(prev));
+                        Object.keys(next).forEach(m => {
+                            Object.keys(next[m]).forEach(d => {
+                                if (next[m][d][oldCat] !== undefined) {
+                                    next[m][d][cleaned] = next[m][d][oldCat];
+                                    delete next[m][d][oldCat];
+                                }
+                            });
+                        });
+                        return next;
+                    });
+                }
+            };
+
+            const handleDeleteCategory = (groupId, catName) => {
+                const group = groups.find(g => g.id === groupId);
+                if (groups.length === 1 && group.categories.length <= 1) { setMessageModal('Harus ada setidaknya 1 Kategori tersisa!'); return; }
+                setConfirmModal({
+                    message: `Hapus Kategori ${catName}?`,
+                    onConfirm: () => { isLocalChange.current = true; setGroups(prev => prev.map(g => g.id === groupId ? {...g, categories: g.categories.filter(c => c !== catName)} : g)); }
                 });
             };
 
@@ -268,252 +399,301 @@
                     message: 'Reset semua data kembali ke pengaturan awal?',
                     onConfirm: () => {
                         isLocalChange.current = true;
-                        setMonths(defaultMonths); setCategories(defaultCategories); setBudgets(defaultBudgets); setActuals(defaultActuals); setSelectedMonth(defaultMonths[0]);
+                        setMonths(defaultMonths); setGroups(defaultGroups); setDailyData({}); setSelectedMonth(defaultMonths[0]);
                     }
                 });
             };
 
-            const generateHTMLString = () => {
-                const table = document.getElementById('dataTable').outerHTML;
-                return `
-                    <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-                    <head>
-                        <meta charset="utf-8" />
-                        <style>
-                            table { border-collapse: collapse; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 13px; }
-                            th, td { border: 1px solid ${colors.border}; padding: 8px; }
-                        </style>
-                    </head>
-                    <body>${table}</body>
-                    </html>
-                `;
-            };
-
             const handleExportExcelWithStyle = () => {
-                const html = generateHTMLString();
+                const table = document.getElementById('dataTable').outerHTML;
+                const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"/><style>table { border-collapse: collapse; font-family: sans-serif; font-size: 13px; } th, td { border: 1px solid ${colors.border}; padding: 8px; }</style></head><body>${table}</body></html>`;
                 const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
                 const url = URL.createObjectURL(blob);
-                const a = document.createElement('a'); a.href = url; a.download = 'Data_Karyawan_Modern.xls'; a.click(); URL.revokeObjectURL(url);
+                const a = document.createElement('a'); a.href = url; a.download = `Allocation_Unit2_${viewMode}.xls`; a.click(); URL.revokeObjectURL(url);
             };
 
-            const cellStyle = { border: `1px solid ${colors.border}`, padding: '0.5rem 0.75rem' };
-            const headerStyle = { ...cellStyle, backgroundColor: colors.headerBg, color: colors.headerText, fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.75rem' };
-            const totalAllHeaderStyle = { ...headerStyle, backgroundColor: colors.totalAllBg };
+            // --- STYLING TABLE ---
+            const cellStyle = { border: `1px solid ${colors.border}`, padding: '0.5rem 0.75rem', minWidth: '80px' };
+            const headerStyle = { ...cellStyle, backgroundColor: colors.headerBg, color: colors.headerText, fontWeight: '600', textTransform: 'uppercase', fontSize: '0.75rem' };
             const subHeaderStyle = { ...cellStyle, backgroundColor: colors.subHeaderBg, color: colors.subHeaderText, fontWeight: '600', fontSize: '0.8rem' };
+            const totalAllHeaderStyle = { ...headerStyle, backgroundColor: colors.totalAllBg };
+
+            // Render Table Rows berdasarkan Grup & Kategori
+            const renderTableBody = (dataSource, getColData, thickDividerStyle) => {
+                let globalIndex = 1;
+                return groups.map((group, gIdx) => (
+                    <React.Fragment key={group.id}>
+                        {group.categories.map((cat, cIdx) => {
+                            const isFirst = cIdx === 0;
+                            const bgColor = globalIndex++ % 2 === 0 ? colors.rowEven : colors.rowOdd;
+                            
+                            return (
+                                <tr key={cat} className="hover:bg-slate-50">
+                                    {isFirst && <td rowSpan={group.categories.length} className="sticky-col bg-white text-center font-bold" style={{...cellStyle, verticalAlign: 'middle', borderRight: '1px solid #cbd5e1', left:0, zIndex:10}}>
+                                        <div className="flex flex-col items-center gap-1">
+                                            <span>{gIdx + 1}</span>
+                                            <div className="flex gap-1 text-slate-400">
+                                                <button onClick={() => handleRenameGroup(group.id, group.name)} title="Rename Grup"><IconEdit /></button>
+                                                <button onClick={() => handleDeleteGroup(group.id, group.name)} className="hover:text-red-500" title="Hapus Grup"><IconX /></button>
+                                            </div>
+                                        </div>
+                                    </td>}
+                                    {isFirst && <td rowSpan={group.categories.length} className="sticky-col-2 bg-slate-100 text-center font-bold tracking-wide" style={{...cellStyle, verticalAlign: 'middle', borderRight: '1px solid #cbd5e1', left:'60px', zIndex:10}}>
+                                        <span style={{writingMode: 'vertical-rl', transform: 'rotate(180deg)'}} className="py-2 text-indigo-800">{group.name}</span>
+                                    </td>}
+                                    
+                                    <td className="sticky-col-3 bg-white text-left font-medium" style={{...cellStyle, left:'105px', zIndex:10, backgroundColor: bgColor}}>
+                                        <div className="flex justify-between items-center w-[180px]">
+                                            <span className="truncate">{cat}</span>
+                                            <div className="flex gap-1 text-slate-300">
+                                                <button onClick={() => handleRenameCategory(group.id, cat)} className="hover:text-blue-500"><IconEdit /></button>
+                                                <button onClick={() => handleDeleteCategory(group.id, cat)} className="hover:text-red-500"><IconX /></button>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    
+                                    {isFirst && <td style={{...cellStyle, backgroundColor: colors.rowEven, textAlign: 'left', color: colors.subHeaderText, ...thickDividerStyle}}>Requirement</td>}
+                                    {cIdx === 1 && <td rowSpan={Math.max(1, group.categories.length - 1)} style={{...cellStyle, backgroundColor: colors.rowEven, textAlign: 'left', color: colors.subHeaderText, verticalAlign: 'middle', ...thickDividerStyle}}>Target</td>}
+                                    {cIdx > 1 && group.categories.length === 1 && <td style={{...cellStyle, ...thickDividerStyle}}></td>} {/* Fallback if only 1 cat */}
+                                    
+                                    {dataSource.map(colId => {
+                                        const data = getColData(colId, cat);
+                                        const actualStyle = getNumberStyle(data.actual, data.target, false);
+                                        const diffStyle = getNumberStyle(data.actual, data.target, true);
+
+                                        return (
+                                            <React.Fragment key={`${cat}-${colId}`}>
+                                                <td style={{...cellStyle, backgroundColor: bgColor}}>{data.target}</td>
+                                                <td style={{...cellStyle, backgroundColor: bgColor, color: actualStyle.color, fontWeight: actualStyle.fontWeight}}>{data.actual}</td>
+                                                <td style={{...cellStyle, backgroundColor: bgColor, color: diffStyle.color, fontWeight: diffStyle.fontWeight, ...thickDividerStyle}}>{data.diff}</td>
+                                            </React.Fragment>
+                                        )
+                                    })}
+                                    
+                                    {/* Total All */}
+                                    <td style={{...cellStyle, backgroundColor: '#f8fafc', fontWeight: '600'}}>{calculatedData.grandTotals[cat].b}</td>
+                                    <td style={{...cellStyle, backgroundColor: '#f8fafc', fontWeight: '600'}}>{calculatedData.grandTotals[cat].a}</td>
+                                    <td style={{...cellStyle, backgroundColor: '#f8fafc', fontWeight: '600'}}>{calculatedData.grandTotals[cat].diff}</td>
+                                </tr>
+                            );
+                        })}
+                    </React.Fragment>
+                ));
+            };
 
             return (
-                <div className="min-h-screen p-3 sm:p-6 md:p-10 text-slate-800 flex flex-col items-center relative w-full overflow-hidden">
-                    {/* MODALS */}
+                <div className="min-h-screen p-3 sm:p-6 md:p-8 text-slate-800 flex flex-col items-center relative w-full overflow-hidden">
                     {messageModal && (
-                        <div className="fixed inset-0 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm z-50 px-4 transition-all">
-                            <div className="bg-white p-8 rounded-2xl shadow-2xl flex flex-col items-center max-w-sm text-center transform scale-100">
-                                <div className="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center mb-4"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></div>
+                        <div className="fixed inset-0 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm z-50 px-4">
+                            <div className="bg-white p-6 rounded-2xl shadow-xl flex flex-col items-center max-w-sm text-center">
                                 <p className="mb-6 font-medium text-slate-700">{messageModal}</p>
-                                <button onClick={() => setMessageModal('')} className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-8 py-2.5 rounded-xl shadow-md transition-all active:scale-95">Mengerti</button>
+                                <button onClick={() => setMessageModal('')} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-xl">Mengerti</button>
                             </div>
                         </div>
                     )}
 
                     {confirmModal && (
-                        <div className="fixed inset-0 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm z-50 px-4 transition-all">
-                            <div className="bg-white p-8 rounded-2xl shadow-2xl flex flex-col items-center max-w-sm text-center">
-                                <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mb-4"><IconTrash /></div>
-                                <p className="mb-6 font-medium text-slate-700 leading-relaxed">{confirmModal.message}</p>
+                        <div className="fixed inset-0 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm z-50 px-4">
+                            <div className="bg-white p-6 rounded-2xl shadow-xl flex flex-col items-center max-w-sm text-center">
+                                <p className="mb-6 font-medium text-slate-700">{confirmModal.message}</p>
                                 <div className="flex gap-3 w-full">
-                                    <button onClick={() => setConfirmModal(null)} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium px-4 py-2.5 rounded-xl transition-all">Batal</button>
-                                    <button onClick={() => { confirmModal.onConfirm(); setConfirmModal(null); }} className="flex-1 bg-red-600 hover:bg-red-700 text-white font-medium px-4 py-2.5 rounded-xl shadow-md transition-all active:scale-95">Ya, Lanjutkan</button>
+                                    <button onClick={() => setConfirmModal(null)} className="flex-1 bg-slate-100 text-slate-700 px-4 py-2 rounded-xl">Batal</button>
+                                    <button onClick={() => { confirmModal.onConfirm(); setConfirmModal(null); }} className="flex-1 bg-red-600 text-white px-4 py-2 rounded-xl">Ya</button>
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    <div className="w-full max-w-[1450px]">
-                        {/* Header Atas */}
-                        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-5 bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                    <div className="w-full max-w-[1600px]">
+                        {/* HEADER UTAMA */}
+                        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 gap-5 bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
                             <div className="flex items-center gap-4">
-                                <div className="p-2 bg-slate-50 rounded-xl border border-slate-100 shadow-sm">
-                                    <img src="hoplun128.png" alt="Logo Hop Lun" className="h-10 w-auto object-contain" onError={(e) => { e.target.style.display = 'none'; }} />
-                                </div>
+                                <img src="hoplun128.png" alt="Logo" className="h-10 w-auto" onError={e => e.target.style.display='none'} />
                                 <div>
-                                    <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Allocation HopLun Unit 2</h1>
-                                    <div className="flex items-center gap-2 mt-1.5">
-                                        {syncStatus === 'synced' && <><div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div><span className="text-xs font-medium text-emerald-700">Tersinkronisasi Realtime</span></>}
-                                        {syncStatus === 'error' && <><div className="w-2.5 h-2.5 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]"></div><span className="text-xs font-medium text-red-700">Tidak Sinkron / Offline</span></>}
-                                        {syncStatus === 'saving' && <><div className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></div><span className="text-xs font-medium text-amber-700">Menyimpan Perubahan...</span></>}
-                                        {syncStatus === 'connecting' && <><div className="w-2.5 h-2.5 rounded-full bg-slate-400 animate-pulse"></div><span className="text-xs font-medium text-slate-500">Menghubungkan...</span></>}
+                                    <h1 className="text-2xl font-bold text-slate-800">Allocation HopLun Unit 2</h1>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        {syncStatus === 'synced' && <><div className="w-2.5 h-2.5 rounded-full bg-emerald-500"></div><span className="text-xs text-emerald-700">Realtime Tersinkronisasi</span></>}
+                                        {syncStatus === 'error' && <><div className="w-2.5 h-2.5 rounded-full bg-red-500"></div><span className="text-xs text-red-700">Offline / Gagal Sinkron</span></>}
+                                        {syncStatus === 'saving' && <><div className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></div><span className="text-xs text-amber-700">Menyimpan...</span></>}
                                     </div>
                                 </div>
                             </div>
-                            <div className="flex flex-wrap gap-3">
-                                <button onClick={handleClearData} className="flex items-center gap-2 bg-white hover:bg-slate-50 text-red-600 border border-slate-200 font-medium px-5 py-2.5 rounded-xl shadow-sm transition-all active:scale-95">
-                                    <IconTrash /> Reset Data
+                            
+                            {/* TABS VIEW MODE */}
+                            <div className="flex bg-slate-100 p-1.5 rounded-xl border border-slate-200">
+                                <button onClick={() => setViewMode('monthly')} className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all ${viewMode === 'monthly' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+                                    <IconBarChart /> Tampilan Bulanan (Summary)
                                 </button>
-                                <button onClick={handleExportExcelWithStyle} className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-5 py-2.5 rounded-xl shadow-sm shadow-emerald-600/20 transition-all active:scale-95">
-                                    <IconDownload /> Export Excel
+                                <button onClick={() => setViewMode('daily')} className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all ${viewMode === 'daily' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+                                    <IconCalendar /> Tampilan Harian (Input)
                                 </button>
                             </div>
                         </div>
 
-                        {/* PANEL KONTROL */}
-                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8 w-full">
-                            
-                            {/* Panel Input Form */}
-                            <div className="lg:col-span-6 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                                <div className="bg-indigo-600 px-5 py-3.5 flex justify-between items-center">
-                                    <h2 className="text-white font-semibold flex items-center gap-2 text-sm sm:text-base">
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
-                                        Panel Input Data
-                                    </h2>
-                                </div>
-                                <div className="p-4 sm:p-5">
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-                                        <div>
-                                            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Pilih Bulan</label>
-                                            <div className="relative">
-                                                <select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className="w-full appearance-none bg-slate-50 border border-slate-200 text-slate-800 font-medium py-2.5 pl-3 pr-10 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-shadow cursor-pointer">
+                        {/* PANEL KONTROL (Hanya Aktif jika ViewMode Daily) */}
+                        {viewMode === 'daily' && (
+                            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8 w-full">
+                                {/* Panel Input Harian */}
+                                <div className="lg:col-span-5 bg-white rounded-2xl shadow-sm border border-indigo-200 overflow-hidden ring-1 ring-indigo-50">
+                                    <div className="bg-indigo-600 px-5 py-3 flex justify-between items-center">
+                                        <h2 className="text-white font-semibold flex items-center gap-2 text-sm">📝 Panel Input Data Harian</h2>
+                                    </div>
+                                    <div className="p-4 sm:p-5">
+                                        <div className="grid grid-cols-3 gap-3 mb-5">
+                                            <div>
+                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Bulan</label>
+                                                <select value={selectedMonth} onChange={(e) => {setSelectedMonth(e.target.value); setSelectedDate(1);}} className="w-full bg-slate-50 border border-slate-200 py-2 px-2 rounded-lg outline-none font-semibold text-sm">
                                                     {months.map(m => <option key={m} value={m}>{m}</option>)}
                                                 </select>
-                                                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-500">
-                                                    <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
-                                                </div>
                                             </div>
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Mode Input</label>
-                                            <div className="relative">
-                                                <select value={inputType} onChange={(e) => setInputType(e.target.value)} className="w-full appearance-none bg-indigo-50 border border-indigo-100 text-indigo-700 font-bold py-2.5 pl-3 pr-10 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 transition-shadow cursor-pointer">
-                                                    <option value="actual">🔢 Input Aktual</option>
-                                                    <option value="budget">🎯 Set Target / Budget</option>
+                                            <div>
+                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Tanggal</label>
+                                                <select value={selectedDate} onChange={(e) => setSelectedDate(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 py-2 px-2 rounded-lg outline-none font-semibold text-sm">
+                                                    {Array.from({length: getDaysInMonth(selectedMonth)}, (_, i) => i + 1).map(d => <option key={d} value={d}>Tgl {d}</option>)}
                                                 </select>
-                                                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-indigo-500">
-                                                    <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Input</label>
+                                                <select value={inputType} onChange={(e) => setInputType(e.target.value)} className="w-full bg-indigo-50 border border-indigo-200 text-indigo-700 py-2 px-2 rounded-lg outline-none font-bold text-sm">
+                                                    <option value="actual">Aktual</option>
+                                                    <option value="target">Target</option>
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 hide-scroll">
+                                            {groups.map(g => (
+                                                <div key={g.id} className="border border-slate-200 rounded-xl overflow-hidden">
+                                                    <div className="bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600 uppercase tracking-wider border-b border-slate-200">{g.name}</div>
+                                                    <div className="p-2 space-y-2">
+                                                        {g.categories.map(cat => (
+                                                            <div key={cat} className="flex items-center justify-between gap-3">
+                                                                <span className="text-sm font-medium text-slate-700 truncate">{cat}</span>
+                                                                <input type="number" value={inputType === 'actual' ? (dailyData[selectedMonth]?.[selectedDate]?.[cat]?.actual ?? '') : (dailyData[selectedMonth]?.[selectedDate]?.[cat]?.target ?? '')} onChange={(e) => handleInputChange(cat, e.target.value)} className="w-24 text-right font-bold text-slate-800 bg-white border border-slate-300 py-1.5 px-2 rounded-lg outline-none focus:border-indigo-500" placeholder="0" />
+                                                            </div>
+                                                        ))}
+                                                    </div>
                                                 </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Panel Settings */}
+                                <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+                                        <h3 className="font-semibold text-slate-800 text-sm mb-3">🛠️ Tambah/Edit Grup</h3>
+                                        <div className="flex gap-2 mb-4">
+                                            <input type="text" value={newGroupStr} onChange={(e) => setNewGroupStr(e.target.value)} className="flex-1 border border-slate-200 px-3 rounded-lg text-sm uppercase" placeholder="Nama Grup Baru" />
+                                            <button onClick={handleAddGroup} className="bg-slate-800 text-white px-3 py-2 rounded-lg text-sm font-medium">Tambah</button>
+                                        </div>
+                                        <h3 className="font-semibold text-slate-800 text-sm mb-3 pt-3 border-t">➕ Tambah Kategori</h3>
+                                        <div className="flex flex-col gap-2">
+                                            <select value={selectedGroupForCat} onChange={e => setSelectedGroupForCat(e.target.value)} className="w-full border border-slate-200 py-2 px-3 rounded-lg text-sm font-medium">
+                                                {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                                            </select>
+                                            <div className="flex gap-2">
+                                                <input type="text" value={newCategoryStr} onChange={(e) => setNewCategoryStr(e.target.value)} className="flex-1 border border-slate-200 px-3 rounded-lg text-sm uppercase" placeholder="Nama Kategori..." />
+                                                <button onClick={handleAddCategory} className="bg-emerald-600 text-white px-3 py-2 rounded-lg text-sm font-medium">Tambah</button>
                                             </div>
                                         </div>
                                     </div>
-
-                                    <div className="space-y-3">
-                                        {categories.map((cat) => (
-                                            <div key={cat} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 p-3 rounded-xl border border-slate-100 bg-slate-50 hover:border-slate-300 transition-colors">
-                                                <div className="flex-1 flex justify-between items-center pr-2">
-                                                    <span className="font-semibold text-sm text-slate-700">{cat}</span>
-                                                    <button onClick={() => handleDeleteCategory(cat)} className="text-slate-400 hover:text-red-500 p-1 rounded-md hover:bg-white transition-colors" title="Hapus Kategori"><IconX /></button>
-                                                </div>
-                                                <div className="w-full sm:w-1/3">
-                                                    <input type="number" value={inputType === 'actual' ? (actuals[selectedMonth]?.[cat] ?? '') : (budgets[selectedMonth]?.[cat] ?? '')} onChange={(e) => handleInputChange(cat, e.target.value)} className="w-full text-right font-semibold text-slate-800 bg-white border border-slate-200 py-2 px-3 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 shadow-inner" placeholder="0" />
-                                                </div>
+                                    <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between">
+                                        <div>
+                                            <h3 className="font-semibold text-slate-800 text-sm mb-3">📅 Pengaturan Bulan</h3>
+                                            <div className="flex gap-2">
+                                                <input type="text" value={newMonthStr} onChange={(e) => setNewMonthStr(e.target.value)} className="flex-1 border border-slate-200 px-3 rounded-lg text-sm" placeholder="Ex: Jul-26" />
+                                                <button onClick={handleAddMonth} className="bg-blue-600 text-white px-3 py-2 rounded-lg text-sm font-medium">Tambah</button>
                                             </div>
-                                        ))}
+                                        </div>
+                                        <div className="flex flex-col gap-2 mt-4 pt-4 border-t border-slate-100">
+                                            <button onClick={handleExportExcelWithStyle} className="w-full flex justify-center items-center gap-2 bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold px-4 py-2.5 rounded-xl hover:bg-emerald-100 transition-colors"><IconDownload/> Export Excel</button>
+                                            <button onClick={handleClearData} className="w-full flex justify-center items-center gap-2 bg-red-50 text-red-600 border border-red-200 font-bold px-4 py-2 rounded-xl hover:bg-red-100 transition-colors"><IconTrash/> Reset Data</button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
+                        )}
 
-                            {/* Panel Tambah */}
-                            <div className="lg:col-span-6 flex flex-col gap-6">
-                                {/* Tambah Kategori */}
-                                <div className="bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-slate-200 flex-1 flex flex-col justify-center relative overflow-hidden">
-                                    <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-50 rounded-bl-full -z-10"></div>
-                                    <h3 className="font-semibold text-slate-800 mb-1 text-sm sm:text-base">Tambah Kategori Baru (Baris)</h3>
-                                    <p className="text-xs text-slate-500 mb-4">Tambahkan baris kriteria karyawan baru ke dalam tabel.</p>
-                                    <div className="flex flex-col sm:flex-row gap-3">
-                                        <input type="text" value={newCategoryStr} onChange={(e) => setNewCategoryStr(e.target.value)} className="flex-1 border border-slate-200 py-2.5 px-4 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 uppercase text-sm font-medium placeholder-slate-400" placeholder="Contoh: STAFF IT..." />
-                                        <button onClick={handleAddCategory} className="flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 text-white px-5 py-2.5 rounded-xl shadow-sm transition-all active:scale-95 font-medium whitespace-nowrap"><IconPlus /> Tambah</button>
-                                    </div>
-                                </div>
-
-                                {/* Tambah Bulan */}
-                                <div className="bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-slate-200 flex-1 flex flex-col justify-center relative overflow-hidden">
-                                    <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50 rounded-bl-full -z-10"></div>
-                                    <h3 className="font-semibold text-slate-800 mb-1 text-sm sm:text-base">Tambah Bulan Baru (Kolom)</h3>
-                                    <p className="text-xs text-slate-500 mb-4">Tambahkan kolom periode/bulan baru ke dalam tabel.</p>
-                                    <div className="flex flex-col sm:flex-row gap-3">
-                                        <input type="text" value={newMonthStr} onChange={(e) => setNewMonthStr(e.target.value)} className="flex-1 border border-slate-200 py-2.5 px-4 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm font-medium placeholder-slate-400" placeholder="Contoh: Jul-26" />
-                                        <button onClick={handleAddMonth} className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl shadow-sm transition-all active:scale-95 font-medium whitespace-nowrap"><IconPlus /> Tambah</button>
-                                    </div>
+                        {/* Banner Informasi Mode Bulanan */}
+                        {viewMode === 'monthly' && (
+                            <div className="flex justify-between items-center bg-indigo-50 border border-indigo-200 p-4 rounded-xl mb-6">
+                                <p className="text-indigo-800 font-medium text-sm flex items-center gap-2">
+                                    <IconBarChart/> Ini adalah Tampilan Ringkasan Bulanan (Data dikalkulasi dari Input Harian). Untuk mengubah angka, beralihlah ke Tampilan Harian.
+                                </p>
+                                <div className="flex gap-3">
+                                    <button onClick={handleExportExcelWithStyle} className="bg-emerald-600 text-white text-xs font-bold px-4 py-2 rounded-lg shadow-sm hover:bg-emerald-700 flex items-center gap-1"><IconDownload/> Export</button>
                                 </div>
                             </div>
+                        )}
 
-                        </div>
-
-                        {/* TABEL OUTPUT (Beautiful Table) */}
-                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden w-full">
-                            <div className="overflow-x-auto p-1 w-full" style={{ WebkitOverflowScrolling: 'touch' }}>
-                                <table id="dataTable" className="border-collapse w-full min-w-max text-center" style={{ border: `1px solid ${colors.border}` }}>
-                                    <thead>
+                        {/* TABEL OUTPUT */}
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden w-full relative">
+                            <div className="overflow-x-auto p-0 m-0 hide-scroll" style={{ WebkitOverflowScrolling: 'touch', maxHeight: '70vh' }}>
+                                <table id="dataTable" className="border-collapse min-w-max text-center relative" style={{ border: `1px solid ${colors.border}` }}>
+                                    <thead className="sticky top-0 z-30">
                                         <tr>
-                                            <th style={headerStyle} rowSpan="2" className="w-12">NO.</th>
-                                            <th style={headerStyle} rowSpan="2" className="text-left">EMPLOYEE CATEGORIES</th>
-                                            <th style={{...headerStyle, ...thickRight}} rowSpan="2" className="w-28 text-left">DETAIL</th>
-                                            {months.map(m => (
-                                                <th key={m} colSpan="3" style={{...headerStyle, ...thickRight}} className="relative group">
-                                                    <div className="flex justify-center items-center gap-2">
-                                                        {m}
-                                                        {months.length > 1 && (
-                                                            <button onClick={() => handleDeleteMonth(m)} className="text-slate-400 hover:text-white transition-colors" title="Hapus Bulan"><IconX /></button>
-                                                        )}
-                                                    </div>
-                                                </th>
-                                            ))}
-                                            <th colSpan="3" style={totalAllHeaderStyle}>TOTAL ALL</th>
+                                            <th style={{...headerStyle, width:'45px', left:0, zIndex:30}} rowSpan="2" className="sticky-col">NO</th>
+                                            <th style={{...headerStyle, width:'20px', left:'45px', zIndex:30}} rowSpan="2" className="sticky-col-2">GRUP</th>
+                                            <th style={{...headerStyle, left:'105px', zIndex:30}} rowSpan="2" className="sticky-col-3 w-48 text-left">EMPLOYEE CATEGORIES</th>
+                                            <th style={{...headerStyle, ...thickRight}} rowSpan="2" className="w-24 text-left">DETAIL</th>
+                                            
+                                            {viewMode === 'monthly' 
+                                                ? months.map(m => <th key={m} colSpan="3" style={{...headerStyle, ...thickRight}}>{m}</th>)
+                                                : Array.from({length: getDaysInMonth(selectedMonth)}, (_, i) => i + 1).map(d => <th key={d} colSpan="3" style={{...headerStyle, ...thickRight}}>Tgl {d}</th>)
+                                            }
+                                            <th colSpan="3" style={{...totalAllHeaderStyle, position:'sticky', right:0, zIndex:30}}>TOTAL ALL</th>
                                         </tr>
                                         <tr>
-                                            {months.map(m => (
-                                                <React.Fragment key={`sub-${m}`}>
-                                                    <th style={subHeaderStyle} className="w-20">Budget</th>
-                                                    <th style={subHeaderStyle} className="w-20">Actual</th>
-                                                    <th style={{...subHeaderStyle, ...thickRight}} className="w-20">Balance</th>
-                                                </React.Fragment>
-                                            ))}
-                                            <th style={{...subHeaderStyle, backgroundColor: '#e2e8f0', color: '#1e293b'}} className="w-24">Budget</th>
-                                            <th style={{...subHeaderStyle, backgroundColor: '#e2e8f0', color: '#1e293b'}} className="w-24">Actual</th>
-                                            <th style={{...subHeaderStyle, backgroundColor: '#e2e8f0', color: '#1e293b'}} className="w-24">Balance</th>
+                                            {viewMode === 'monthly'
+                                                ? months.map(m => (
+                                                    <React.Fragment key={`sub-${m}`}>
+                                                        <th style={subHeaderStyle} className="w-20">Target</th>
+                                                        <th style={subHeaderStyle} className="w-20">Actual</th>
+                                                        <th style={{...subHeaderStyle, ...thickRight}} className="w-20">Diff</th>
+                                                    </React.Fragment>
+                                                ))
+                                                : Array.from({length: getDaysInMonth(selectedMonth)}, (_, i) => i + 1).map(d => (
+                                                    <React.Fragment key={`subd-${d}`}>
+                                                        <th style={subHeaderStyle} className="w-16">Tgt</th>
+                                                        <th style={subHeaderStyle} className="w-16">Act</th>
+                                                        <th style={{...subHeaderStyle, ...thickRight}} className="w-16">Diff</th>
+                                                    </React.Fragment>
+                                                ))
+                                            }
+                                            <th style={{...subHeaderStyle, backgroundColor: '#e2e8f0', color: '#1e293b', position:'sticky', right:'160px', zIndex:30}} className="w-20">Target</th>
+                                            <th style={{...subHeaderStyle, backgroundColor: '#e2e8f0', color: '#1e293b', position:'sticky', right:'80px', zIndex:30}} className="w-20">Actual</th>
+                                            <th style={{...subHeaderStyle, backgroundColor: '#e2e8f0', color: '#1e293b', position:'sticky', right:0, zIndex:30}} className="w-20">Diff</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {categories.map((cat, idx) => {
-                                            const isFirst = idx === 0;
-                                            const bgColor = idx % 2 === 0 ? colors.rowEven : colors.rowOdd;
-                                            
-                                            return (
-                                                <tr key={cat} className="hover:bg-slate-50 transition-colors">
-                                                    {isFirst && <td rowSpan={categories.length} style={{...cellStyle, backgroundColor: colors.rowEven, fontWeight: 'bold', color: colors.textNormal, verticalAlign: 'middle'}}>1</td>}
-                                                    <td style={{...cellStyle, backgroundColor: bgColor, textAlign: 'left', fontWeight: '500', color: colors.textNormal}}>{cat}</td>
-                                                    {isFirst && <td style={{...cellStyle, backgroundColor: colors.rowEven, textAlign: 'left', color: colors.subHeaderText, ...thickRight}}>Requirement</td>}
-                                                    {idx === 1 && <td rowSpan={categories.length - 1} style={{...cellStyle, backgroundColor: colors.rowEven, textAlign: 'left', color: colors.subHeaderText, verticalAlign: 'middle', ...thickRight}}>Target</td>}
-                                                    
-                                                    {months.map(m => {
-                                                        const data = calculatedData.calc[m][cat];
-                                                        // Format kondisional warna khusus
-                                                        const actualStyle = getNumberStyle(data.actual, data.budget, false);
-                                                        const balanceStyle = getNumberStyle(data.actual, data.budget, true);
-
-                                                        return (
-                                                            <React.Fragment key={`${cat}-${m}`}>
-                                                                <td style={{...cellStyle, backgroundColor: bgColor, color: colors.textNormal}}>{data.budget}</td>
-                                                                <td style={{...cellStyle, backgroundColor: bgColor, color: actualStyle.color, fontWeight: actualStyle.fontWeight}}>{data.actual}</td>
-                                                                <td style={{...cellStyle, backgroundColor: bgColor, color: balanceStyle.color, fontWeight: balanceStyle.fontWeight, ...thickRight}}>{data.balance}</td>
-                                                            </React.Fragment>
-                                                        )
-                                                    })}
-                                                    <td style={{...cellStyle, backgroundColor: '#f8fafc', fontWeight: '600', color: colors.textNormal}}>{calculatedData.totals[cat].b}</td>
-                                                    <td style={{...cellStyle, backgroundColor: '#f8fafc', fontWeight: '600', color: colors.textNormal}}>{calculatedData.totals[cat].a}</td>
-                                                    <td style={{...cellStyle, backgroundColor: '#f8fafc', fontWeight: '600', color: colors.textNormal}}>{calculatedData.totals[cat].bal}</td>
-                                                </tr>
-                                            );
-                                        })}
-                                        {/* Baris TOTAL Terbawah */}
+                                        {viewMode === 'monthly' 
+                                            ? renderTableBody(months, (m, cat) => calculatedData.calcMonthly[m][cat], thickRight)
+                                            : renderTableBody(Array.from({length: getDaysInMonth(selectedMonth)}, (_, i) => i + 1), (d, cat) => calculatedData.calcDaily[selectedMonth][d][cat], thickRight)
+                                        }
+                                        
+                                        {/* Baris GRAND TOTAL Terbawah */}
                                         <tr>
-                                            <td colSpan="3" style={{...cellStyle, backgroundColor: colors.totalRowBg, color: colors.totalRowText, fontWeight: '700', textAlign: 'left', letterSpacing: '0.05em', ...thickRight}}>GRAND TOTAL</td>
-                                            {months.map(m => (
-                                                <React.Fragment key={`total-${m}`}>
-                                                    <td style={{...cellStyle, backgroundColor: colors.totalRowBg, color: colors.totalRowText, fontWeight: '700'}}>{calculatedData.monthlyTotals[m].budget}</td>
-                                                    <td style={{...cellStyle, backgroundColor: colors.totalRowBg, color: colors.totalRowText, fontWeight: '700'}}>{calculatedData.monthlyTotals[m].actual}</td>
-                                                    <td style={{...cellStyle, backgroundColor: colors.totalRowBg, color: colors.totalRowText, fontWeight: '700', ...thickRight}}>{calculatedData.monthlyTotals[m].balance}</td>
-                                                </React.Fragment>
-                                            ))}
-                                            <td style={{...cellStyle, backgroundColor: colors.totalAllBg, color: '#ffffff', fontWeight: '700'}}>{calculatedData.grandTotal.budget}</td>
-                                            <td style={{...cellStyle, backgroundColor: colors.totalAllBg, color: '#ffffff', fontWeight: '700'}}>{calculatedData.grandTotal.actual}</td>
-                                            <td style={{...cellStyle, backgroundColor: colors.totalAllBg, color: '#ffffff', fontWeight: '700'}}>{calculatedData.grandTotal.balance}</td>
+                                            <td colSpan="4" style={{...cellStyle, backgroundColor: colors.totalRowBg, color: colors.totalRowText, fontWeight: '800', textAlign: 'center', letterSpacing: '0.05em', ...thickRight, position:'sticky', left:0, zIndex:20}}>GRAND TOTAL</td>
+                                            {viewMode === 'monthly'
+                                                ? months.map(m => (
+                                                    <React.Fragment key={`total-${m}`}>
+                                                        <td style={{...cellStyle, backgroundColor: colors.totalRowBg, color: colors.totalRowText, fontWeight: '700'}}>{calculatedData.monthlyVertTotals[m].target}</td>
+                                                        <td style={{...cellStyle, backgroundColor: colors.totalRowBg, color: colors.totalRowText, fontWeight: '700'}}>{calculatedData.monthlyVertTotals[m].actual}</td>
+                                                        <td style={{...cellStyle, backgroundColor: colors.totalRowBg, color: colors.totalRowText, fontWeight: '700', ...thickRight}}>{calculatedData.monthlyVertTotals[m].diff}</td>
+                                                    </React.Fragment>
+                                                ))
+                                                : Array.from({length: getDaysInMonth(selectedMonth)}, (_, i) => i + 1).map(d => (
+                                                    <React.Fragment key={`totald-${d}`}>
+                                                        <td style={{...cellStyle, backgroundColor: colors.totalRowBg, color: colors.totalRowText, fontWeight: '700'}}>{calculatedData.dailyVertTotals[d].target}</td>
+                                                        <td style={{...cellStyle, backgroundColor: colors.totalRowBg, color: colors.totalRowText, fontWeight: '700'}}>{calculatedData.dailyVertTotals[d].actual}</td>
+                                                        <td style={{...cellStyle, backgroundColor: colors.totalRowBg, color: colors.totalRowText, fontWeight: '700', ...thickRight}}>{calculatedData.dailyVertTotals[d].diff}</td>
+                                                    </React.Fragment>
+                                                ))
+                                            }
+                                            <td style={{...cellStyle, backgroundColor: colors.totalAllBg, color: '#ffffff', fontWeight: '800', position:'sticky', right:'160px', zIndex:20}}>{calculatedData.finalGrandTotal.target}</td>
+                                            <td style={{...cellStyle, backgroundColor: colors.totalAllBg, color: '#ffffff', fontWeight: '800', position:'sticky', right:'80px', zIndex:20}}>{calculatedData.finalGrandTotal.actual}</td>
+                                            <td style={{...cellStyle, backgroundColor: colors.totalAllBg, color: '#ffffff', fontWeight: '800', position:'sticky', right:0, zIndex:20}}>{calculatedData.finalGrandTotal.diff}</td>
                                         </tr>
                                     </tbody>
                                 </table>

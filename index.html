@@ -24,6 +24,8 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <!-- Supabase JS Client -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- SheetJS untuk Export XLSX -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         /* Custom Sticky Scrollbar */
         .sticky-col { position: sticky; left: 0; z-index: 20; }
@@ -50,6 +52,7 @@
         const IconEdit = () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>;
         const IconCalendar = () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>;
         const IconBarChart = () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>;
+        const IconHistory = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>;
 
         // Supabase Setup
         const supabaseUrl = 'https://slqolbmmcwanrljaaddw.supabase.co';
@@ -76,7 +79,7 @@
 
         // Helper Format Warna
         const getNumberStyle = (actual, target) => {
-            const diff = actual - target; // Logika: Actual - Target
+            const diff = actual - target; 
             let color = colors.textNormal;
             let fontWeight = 'normal';
 
@@ -90,12 +93,10 @@
             return { color, fontWeight };
         };
 
-        // Helper untuk menambahkan tanda + (plus) jika nilai positif
         const formatDiff = (val) => {
             return val > 0 ? `+${val}` : val;
         };
 
-        // --- HELPER UNTUK TANGGAL DINAMIS ---
         const getDaysInMonth = (monthStr) => {
             if(!monthStr) return 30;
             const [mStr, yStr] = monthStr.split('-');
@@ -122,20 +123,23 @@
             const [viewMode, setViewMode] = useState('monthly');
             
             // --- State untuk Fitur User Online & Deduplikasi ---
-            const [sessionId] = useState(() => generateId()); // ID unik tiap tab
+            const [sessionId] = useState(() => generateId()); 
             const [myUser, setMyUser] = useState(() => {
                 const savedUser = localStorage.getItem('hoplun_username');
                 if (savedUser) return savedUser;
-                const newUser = 'ADMIN'; // Default jadi ADMIN
+                const newUser = 'ADMIN'; 
                 localStorage.setItem('hoplun_username', newUser);
                 return newUser;
             });
             const [onlineUsers, setOnlineUsers] = useState([]);
             const channelRef = useRef(null);
 
+            // --- State Utama ---
             const [months, setMonths] = useState(defaultMonths);
             const [groups, setGroups] = useState(defaultGroups);
             const [dailyData, setDailyData] = useState({});
+            const [logs, setLogs] = useState([]); // State untuk Log Aktivitas
+            const [adminPassword, setAdminPassword] = useState('AGUNG'); // State Password Admin
             
             const [selectedMonth, setSelectedMonth] = useState('Apr-26');
             const [selectedDate, setSelectedDate] = useState(() => getMonthRange('Apr-26').start);
@@ -148,10 +152,28 @@
 
             const [messageModal, setMessageModal] = useState('');
             const [confirmModal, setConfirmModal] = useState(null);
+            const [showLogModal, setShowLogModal] = useState(false);
+            
+            // State untuk mendeteksi perubahan saat focus sel tabel (mencegah spam log saat mengetik)
+            const [focusedCellValue, setFocusedCellValue] = useState('');
             
             const [syncStatus, setSyncStatus] = useState('connecting'); 
             const isLocalChange = useRef(false);
-            const tableContainerRef = useRef(null); // Ref untuk menargetkan kontainer tabel
+            const tableContainerRef = useRef(null);
+
+            // --- FUNGSI PENCATAT LOG ---
+            const logActivity = (action, details) => {
+                const newLog = {
+                    id: generateId(),
+                    timestamp: new Date().toISOString(),
+                    user: myUser,
+                    action,
+                    details
+                };
+                // Simpan maksimal 500 log terakhir agar tidak memberatkan database
+                setLogs(prev => [newLog, ...prev].slice(0, 500));
+                isLocalChange.current = true;
+            };
 
             useEffect(() => {
                 const fetchAndSubscribe = async () => {
@@ -192,6 +214,10 @@
                         }
                         setDailyData(loadedDaily);
 
+                        // Ambil Data Log dari kolom Budgets (Hack cerdas agar tak perlu buat tabel SQL baru)
+                        setLogs(data.budgets?.activity_logs || []);
+                        setAdminPassword(data.budgets?.admin_password || 'AGUNG');
+
                         if (data.months && data.months.length > 0 && !data.months.includes(selectedMonth)) {
                             setSelectedMonth(data.months[0]);
                             setSelectedDate(getMonthRange(data.months[0]).start);
@@ -212,7 +238,7 @@
                     });
                     channelRef.current = channel;
 
-                    // Listener untuk User Online (Dengan penyaringan Anti-Duplikat)
+                    // Listener untuk User Online
                     channel.on('presence', { event: 'sync' }, () => {
                         const state = channel.presenceState();
                         const users = [];
@@ -221,7 +247,6 @@
                                 users.push(state[key][0].username);
                             }
                         }
-                        // Set digunakan untuk menghapus nama yang sama jika user membuka 2 tab
                         setOnlineUsers([...new Set(users)]);
                     });
 
@@ -234,6 +259,8 @@
                                     setMonths(payload.new.months || defaultMonths);
                                     setGroups(payload.new.categories || defaultGroups);
                                     setDailyData(payload.new.actuals || {});
+                                    setLogs(payload.new.budgets?.activity_logs || []);
+                                    setAdminPassword(payload.new.budgets?.admin_password || 'AGUNG');
                                 }
                             }
                         }
@@ -266,7 +293,16 @@
                 if (!isLocalChange.current) return;
                 setSyncStatus('saving');
                 const timeoutId = setTimeout(async () => {
-                    const payload = { id: 'main_doc', months: months, categories: groups, actuals: dailyData, budgets: {} };
+                    const payload = { 
+                        id: 'main_doc', 
+                        months: months, 
+                        categories: groups, 
+                        actuals: dailyData, 
+                        budgets: { 
+                            activity_logs: logs,
+                            admin_password: adminPassword 
+                        } 
+                    };
                     localStorage.setItem('karyawan_data_local', JSON.stringify(payload));
                     try {
                         const { error } = await supabaseClient.from('karyawan_data').upsert(payload);
@@ -280,14 +316,13 @@
                     }
                 }, 800);
                 return () => clearTimeout(timeoutId);
-            }, [months, groups, dailyData]);
+            }, [months, groups, dailyData, logs]);
 
             // --- LOGIKA KALKULASI DATA (KUMULATIF BERKELANJUTAN) ---
             const calculatedData = useMemo(() => {
                 const calcDaily = {}; 
                 const calcMonthly = {};
                 const grandTotals = {}; 
-                let carryover = {};
                 
                 const allCats = groups.flatMap(g => g.categories);
                 
@@ -385,12 +420,8 @@
                 if (viewMode === 'daily' && tableContainerRef.current) {
                     const targetCol = document.getElementById(`col-date-${selectedDate}`);
                     if (targetCol) {
-                        // Menggeser dikurangi 300px agar tidak tertutup oleh kolom sticky (No, Grup, Kategori) di kiri
                         const stickyOffset = 300; 
-                        tableContainerRef.current.scrollTo({
-                            left: targetCol.offsetLeft - stickyOffset,
-                            behavior: 'smooth'
-                        });
+                        tableContainerRef.current.scrollTo({ left: targetCol.offsetLeft - stickyOffset, behavior: 'smooth' });
                     }
                 }
             }, [selectedDate, viewMode]);
@@ -402,14 +433,33 @@
                     const cleanedName = newName.trim().toUpperCase();
                     setMyUser(cleanedName);
                     localStorage.setItem('hoplun_username', cleanedName);
-                    // Langsung update nama di server realtime agar laptop lain bisa melihatnya
                     if (channelRef.current) {
                         await channelRef.current.track({ username: cleanedName });
                     }
                 }
             };
 
-            // --- HANDLERS LAINNYA ---
+            // --- HANDLERS KEAMANAN LOG & ADMIN ---
+            const handleOpenAdminModal = () => {
+                const pwd = window.prompt("Masukkan Password Admin:");
+                if (pwd && pwd === adminPassword) {
+                    setShowLogModal(true);
+                } else if (pwd !== null) {
+                    setMessageModal("Password Salah!");
+                }
+            };
+
+            const handleChangePassword = () => {
+                const newPwd = window.prompt("Masukkan Password Baru untuk Admin:");
+                if (newPwd && newPwd.trim() !== '') {
+                    setAdminPassword(newPwd.trim());
+                    isLocalChange.current = true;
+                    logActivity('UBAH_PASSWORD', `Password Admin telah diubah`);
+                    setMessageModal("Password Admin berhasil diperbarui!");
+                }
+            };
+
+            // --- HANDLERS DATA & LOGGING ---
             const handleInputChange = (cat, value) => {
                 isLocalChange.current = true;
                 const numValue = value === '' ? '' : Number(value);
@@ -428,11 +478,21 @@
                 }));
             };
 
+            const handleInputBlur = (cat, value) => {
+                const numValue = value === '' ? '' : Number(value);
+                const prevValue = focusedCellValue === '' ? '' : Number(focusedCellValue);
+                if (numValue !== prevValue) {
+                    const strType = inputType === 'actual' ? 'Aktual' : 'Target';
+                    logActivity('UBAH_DATA', `Mengubah ${strType} ${cat} (${selectedMonth} Tgl ${selectedDate}) dari ${prevValue} menjadi ${numValue}`);
+                }
+            };
+
             const handleAddMonth = () => {
                 if (!newMonthStr.trim() || months.includes(newMonthStr.trim())) return;
-                isLocalChange.current = true;
-                setMonths(prev => [...prev, newMonthStr.trim()]);
+                const newM = newMonthStr.trim();
+                setMonths(prev => [...prev, newM]);
                 setNewMonthStr('');
+                logActivity('TAMBAH_BULAN', `Menambahkan kolom bulan baru: ${newM}`);
             };
 
             const handleDeleteMonth = (monthToDelete) => {
@@ -440,31 +500,32 @@
                 setConfirmModal({
                     message: `Yakin hapus kolom bulan ${monthToDelete}?`,
                     onConfirm: () => {
-                        isLocalChange.current = true;
                         const newMonths = months.filter(m => m !== monthToDelete);
                         setMonths(newMonths);
                         if (selectedMonth === monthToDelete) {
                             setSelectedMonth(newMonths[0]);
                             setSelectedDate(getMonthRange(newMonths[0]).start);
                         }
+                        logActivity('HAPUS_BULAN', `Menghapus kolom bulan: ${monthToDelete}`);
                     }
                 });
             };
 
             const handleAddGroup = () => {
                 if(!newGroupStr.trim()) return;
-                isLocalChange.current = true;
                 const newG = { id: generateId(), name: newGroupStr.trim().toUpperCase(), categories: [] };
                 setGroups(prev => [...prev, newG]);
                 setNewGroupStr('');
                 setSelectedGroupForCat(newG.id);
+                logActivity('TAMBAH_GRUP', `Menambahkan Grup baru: ${newG.name}`);
             };
 
             const handleRenameGroup = (groupId, oldName) => {
                 const newName = window.prompt("Ubah nama Grup:", oldName);
                 if(newName && newName.trim() !== oldName) {
-                    isLocalChange.current = true;
-                    setGroups(prev => prev.map(g => g.id === groupId ? {...g, name: newName.trim().toUpperCase()} : g));
+                    const cleaned = newName.trim().toUpperCase();
+                    setGroups(prev => prev.map(g => g.id === groupId ? {...g, name: cleaned} : g));
+                    logActivity('UBAH_NAMA_GRUP', `Mengubah nama Grup '${oldName}' menjadi '${cleaned}'`);
                 }
             };
 
@@ -472,16 +533,19 @@
                 if(groups.length <= 1) { setMessageModal('Minimal harus ada 1 Grup tersisa!'); return; }
                 setConfirmModal({
                     message: `Hapus grup ${name} beserta isinya?`,
-                    onConfirm: () => { isLocalChange.current = true; setGroups(prev => prev.filter(g => g.id !== groupId)); }
+                    onConfirm: () => { 
+                        setGroups(prev => prev.filter(g => g.id !== groupId)); 
+                        logActivity('HAPUS_GRUP', `Menghapus Grup beserta isinya: ${name}`);
+                    }
                 });
             };
 
             const handleAddCategory = () => {
                 const catName = newCategoryStr.trim().toUpperCase();
                 if (!catName || calculatedData.allCats.includes(catName)) { setMessageModal("Kategori sudah ada atau kosong!"); return; }
-                isLocalChange.current = true;
                 setGroups(prev => prev.map(g => g.id === selectedGroupForCat ? {...g, categories: [...g.categories, catName]} : g));
                 setNewCategoryStr('');
+                logActivity('TAMBAH_KATEGORI', `Menambahkan kategori baris baru: ${catName}`);
             };
 
             const handleRenameCategory = (groupId, oldCat) => {
@@ -489,7 +553,6 @@
                 if(newCat && newCat.trim() !== oldCat) {
                     const cleaned = newCat.trim().toUpperCase();
                     if(calculatedData.allCats.includes(cleaned)) { setMessageModal("Nama Kategori sudah digunakan!"); return; }
-                    isLocalChange.current = true;
                     setGroups(prev => prev.map(g => g.id === groupId ? {...g, categories: g.categories.map(c => c === oldCat ? cleaned : c)} : g));
                     setDailyData(prev => {
                         const next = JSON.parse(JSON.stringify(prev));
@@ -503,6 +566,7 @@
                         });
                         return next;
                     });
+                    logActivity('UBAH_NAMA_KATEGORI', `Mengubah nama kategori '${oldCat}' menjadi '${cleaned}'`);
                 }
             };
 
@@ -511,7 +575,10 @@
                 if (groups.length === 1 && group.categories.length <= 1) { setMessageModal('Harus ada setidaknya 1 Kategori tersisa!'); return; }
                 setConfirmModal({
                     message: `Hapus Kategori ${catName}?`,
-                    onConfirm: () => { isLocalChange.current = true; setGroups(prev => prev.map(g => g.id === groupId ? {...g, categories: g.categories.filter(c => c !== catName)} : g)); }
+                    onConfirm: () => { 
+                        setGroups(prev => prev.map(g => g.id === groupId ? {...g, categories: g.categories.filter(c => c !== catName)} : g)); 
+                        logActivity('HAPUS_KATEGORI', `Menghapus kategori baris: ${catName}`);
+                    }
                 });
             };
 
@@ -519,16 +586,40 @@
                 setConfirmModal({
                     message: 'Reset semua data kembali ke pengaturan awal?',
                     onConfirm: () => {
-                        isLocalChange.current = true;
                         setMonths(defaultMonths); setGroups(defaultGroups); setDailyData({}); 
                         setSelectedMonth(defaultMonths[0]); setSelectedDate(getMonthRange(defaultMonths[0]).start);
+                        logActivity('RESET_DATA', `Mereset ulang seluruh data aplikasi ke pengaturan awal`);
                     }
                 });
             };
 
+            const handleClearLog = () => {
+                setConfirmModal({
+                    message: 'Hapus riwayat seluruh log aktivitas?',
+                    onConfirm: () => {
+                        setLogs([]);
+                        logActivity('CLEAR_LOG', `Membersihkan seluruh riwayat log aktivitas.`);
+                        setShowLogModal(false);
+                    }
+                });
+            };
+
+            // --- EXPORT EXCEL ---
             const generateHTMLString = () => {
-                const tableHTML = document.getElementById('dataTable').outerHTML;
-                const reportTitle = `Laporan ${viewMode === 'daily' ? 'Harian' : 'Bulanan'} - ${selectedMonth}`;
+                const tableElement = document.getElementById('dataTable');
+                const tableClone = tableElement.cloneNode(true);
+                
+                const ths = tableClone.querySelectorAll('th');
+                ths.forEach(th => {
+                    const text = th.innerText.trim();
+                    if (/^[A-Za-z]{3}-\d{2}$/.test(text)) {
+                        th.style.cssText += '; mso-number-format:"\\@";';
+                        th.innerHTML = '&#8203;' + th.innerHTML; 
+                    }
+                });
+
+                const tableHTML = tableClone.outerHTML;
+                const reportTitle = `Report ${viewMode === 'daily' ? 'Daily' : 'Monthly'} - ${selectedMonth}`;
                 
                 return `
                     <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
@@ -537,11 +628,10 @@
                         <style>
                             table { border-collapse: collapse; font-family: sans-serif; font-size: 13px; }
                             th, td { border: 1px solid ${colors.border}; padding: 8px; }
-                            th { mso-number-format: "\\@"; } /* Mencegah Excel mengubah teks seperti MAR-26 menjadi format Date otomatis */
                         </style>
                     </head>
                     <body>
-                        <h2 style="font-family: sans-serif; color: ${colors.textNormal}; margin-bottom: 10px;">${reportTitle}</h2>
+                        <h2 style="font-family: sans-serif; color: ${colors.textNormal}; margin-bottom: 15px;">${reportTitle}</h2>
                         ${tableHTML}
                     </body>
                     </html>
@@ -552,7 +642,29 @@
                 const html = generateHTMLString();
                 const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
                 const url = URL.createObjectURL(blob);
-                const a = document.createElement('a'); a.href = url; a.download = `Allocation_Unit2_${viewMode}.xls`; a.click(); URL.revokeObjectURL(url);
+                const a = document.createElement('a'); 
+                a.href = url; 
+                a.download = `Report_HopLun_Unit2_${viewMode}.xls`; 
+                a.click(); 
+                URL.revokeObjectURL(url);
+            };
+
+            const handleExportLogXLSX = () => {
+                // Menyiapkan data JSON untuk diekspor ke format XLSX
+                const dataToExport = logs.map(log => ({
+                    "Waktu": new Date(log.timestamp).toLocaleString('id-ID'),
+                    "User": log.user,
+                    "Aksi": log.action,
+                    "Detail Keterangan": log.details
+                }));
+
+                // Membuat lembar kerja dan buku kerja baru menggunakan SheetJS
+                const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+                const workbook = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(workbook, worksheet, "Log Aktivitas");
+                
+                // Memicu unduhan file dengan ekstensi asli .xlsx
+                XLSX.writeFile(workbook, "Log_Aktivitas_HopLun.xlsx");
             };
 
             // --- STYLING TABLE ---
@@ -628,6 +740,7 @@
 
             return (
                 <div className="min-h-screen p-3 sm:p-6 md:p-8 text-slate-800 flex flex-col items-center relative w-full overflow-hidden">
+                    {/* MODALS */}
                     {messageModal && (
                         <div className="fixed inset-0 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm z-50 px-4">
                             <div className="bg-white p-6 rounded-2xl shadow-xl flex flex-col items-center max-w-sm text-center">
@@ -644,6 +757,56 @@
                                 <div className="flex gap-3 w-full">
                                     <button onClick={() => setConfirmModal(null)} className="flex-1 bg-slate-100 text-slate-700 px-4 py-2 rounded-xl">Batal</button>
                                     <button onClick={() => { confirmModal.onConfirm(); setConfirmModal(null); }} className="flex-1 bg-red-600 text-white px-4 py-2 rounded-xl">Ya</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    {/* MODAL LOG AKTIVITAS / ADMIN */}
+                    {showLogModal && (
+                        <div className="fixed inset-0 flex justify-center items-start pt-10 pb-10 bg-slate-900/60 backdrop-blur-sm z-50 px-4">
+                            <div className="bg-white rounded-2xl shadow-2xl flex flex-col w-full max-w-4xl max-h-[90vh] overflow-hidden border border-slate-200">
+                                <div className="bg-slate-800 p-5 flex justify-between items-center text-white">
+                                    <div>
+                                        <h2 className="text-lg font-bold flex items-center gap-2"><IconHistory/> Panel Admin & Log Aktivitas</h2>
+                                        <p className="text-xs text-slate-400 mt-1">Daftar riwayat input dan pengaturan keamanan admin.</p>
+                                    </div>
+                                    <button onClick={() => setShowLogModal(false)} className="text-slate-400 hover:text-white p-1"><IconX/></button>
+                                </div>
+                                
+                                <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-col md:flex-row justify-between items-center gap-3">
+                                    <span className="text-sm font-semibold text-slate-600">Total Log: {logs.length} Baris</span>
+                                    <div className="flex gap-2">
+                                        <button onClick={handleChangePassword} className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg"><IconEdit/> Ubah Password</button>
+                                        <button onClick={handleExportLogXLSX} className="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg"><IconDownload/> Download XLSX</button>
+                                        <button onClick={handleClearLog} className="flex items-center gap-1 bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg"><IconTrash/> Bersihkan Log</button>
+                                    </div>
+                                </div>
+
+                                <div className="overflow-y-auto flex-1 p-4 bg-white">
+                                    {logs.length === 0 ? (
+                                        <div className="text-center text-slate-400 py-10 font-medium">Belum ada riwayat aktivitas tercatat.</div>
+                                    ) : (
+                                        <table className="w-full text-left border-collapse text-sm">
+                                            <thead>
+                                                <tr className="bg-slate-100 text-slate-600">
+                                                    <th className="p-3 border-b font-semibold w-40">Waktu</th>
+                                                    <th className="p-3 border-b font-semibold w-32">User</th>
+                                                    <th className="p-3 border-b font-semibold w-40">Aksi</th>
+                                                    <th className="p-3 border-b font-semibold">Detail Keterangan</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {logs.map(log => (
+                                                    <tr key={log.id} className="hover:bg-slate-50 border-b border-slate-100 last:border-0 text-slate-700">
+                                                        <td className="p-3 text-xs">{new Date(log.timestamp).toLocaleString('id-ID')}</td>
+                                                        <td className="p-3 font-semibold text-indigo-700">{log.user}</td>
+                                                        <td className="p-3"><span className="bg-slate-200 text-slate-700 px-2 py-1 rounded text-xs font-bold">{log.action}</span></td>
+                                                        <td className="p-3 text-slate-600">{log.details}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -684,13 +847,18 @@
                                 </div>
                             </div>
                             
-                            {/* TABS VIEW MODE */}
-                            <div className="flex bg-slate-100 p-1.5 rounded-xl border border-slate-200">
-                                <button onClick={() => setViewMode('monthly')} className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all ${viewMode === 'monthly' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-                                    <IconBarChart /> Bulanan (Summary)
-                                </button>
-                                <button onClick={() => setViewMode('daily')} className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all ${viewMode === 'daily' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-                                    <IconCalendar /> Harian (Input)
+                            {/* TABS & LOG */}
+                            <div className="flex flex-wrap items-center gap-3">
+                                <div className="flex bg-slate-100 p-1.5 rounded-xl border border-slate-200">
+                                    <button onClick={() => setViewMode('monthly')} className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all ${viewMode === 'monthly' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+                                        <IconBarChart /> Bulanan
+                                    </button>
+                                    <button onClick={() => setViewMode('daily')} className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all ${viewMode === 'daily' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+                                        <IconCalendar /> Harian
+                                    </button>
+                                </div>
+                                <button onClick={handleOpenAdminModal} className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-slate-800 hover:bg-slate-900 text-white shadow-sm transition-all">
+                                    <IconHistory /> Admin
                                 </button>
                             </div>
                         </div>
@@ -745,7 +913,15 @@
                                                         {g.categories.map(cat => (
                                                             <div key={cat} className="flex items-center justify-between gap-3">
                                                                 <span className="text-sm font-medium text-slate-700 truncate">{cat}</span>
-                                                                <input type="number" value={inputType === 'actual' ? (dailyData[selectedMonth]?.[selectedDate]?.[cat]?.actual ?? '') : (dailyData[selectedMonth]?.[selectedDate]?.[cat]?.target ?? '')} onChange={(e) => handleInputChange(cat, e.target.value)} className="w-24 text-right font-bold text-slate-800 bg-white border border-slate-300 py-1.5 px-2 rounded-lg outline-none focus:border-indigo-500" placeholder="0" />
+                                                                <input 
+                                                                    type="number" 
+                                                                    value={inputType === 'actual' ? (dailyData[selectedMonth]?.[selectedDate]?.[cat]?.actual ?? '') : (dailyData[selectedMonth]?.[selectedDate]?.[cat]?.target ?? '')} 
+                                                                    onChange={(e) => handleInputChange(cat, e.target.value)} 
+                                                                    onFocus={(e) => setFocusedCellValue(e.target.value)}
+                                                                    onBlur={(e) => handleInputBlur(cat, e.target.value)}
+                                                                    className="w-24 text-right font-bold text-slate-800 bg-white border border-slate-300 py-1.5 px-2 rounded-lg outline-none focus:border-indigo-500" 
+                                                                    placeholder="0" 
+                                                                />
                                                             </div>
                                                         ))}
                                                     </div>
@@ -783,8 +959,8 @@
                                             </div>
                                         </div>
                                         <div className="flex flex-col gap-2 mt-4 pt-4 border-t border-slate-100">
-                                            <button onClick={handleExportExcelWithStyle} className="w-full flex justify-center items-center gap-2 bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold px-4 py-2.5 rounded-xl hover:bg-emerald-100 transition-colors"><IconDownload/> Export Excel</button>
-                                            <button onClick={handleClearData} className="w-full flex justify-center items-center gap-2 bg-red-50 text-red-600 border border-red-200 font-bold px-4 py-2 rounded-xl hover:bg-red-100 transition-colors"><IconTrash/> Reset Data</button>
+                                            <button onClick={handleExportExcelWithStyle} className="w-full flex justify-center items-center gap-2 bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold px-4 py-2.5 rounded-xl hover:bg-emerald-100 transition-colors"><IconDownload/> Export Excel Laporan</button>
+                                            <button onClick={handleClearData} className="w-full flex justify-center items-center gap-2 bg-red-50 text-red-600 border border-red-200 font-bold px-4 py-2 rounded-xl hover:bg-red-100 transition-colors"><IconTrash/> Reset & Bersihkan Data</button>
                                         </div>
                                     </div>
                                 </div>

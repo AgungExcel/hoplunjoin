@@ -526,9 +526,30 @@
                 });
             };
 
+            const generateHTMLString = () => {
+                const tableHTML = document.getElementById('dataTable').outerHTML;
+                const reportTitle = `Laporan ${viewMode === 'daily' ? 'Harian' : 'Bulanan'} - ${selectedMonth}`;
+                
+                return `
+                    <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+                    <head>
+                        <meta charset="utf-8" />
+                        <style>
+                            table { border-collapse: collapse; font-family: sans-serif; font-size: 13px; }
+                            th, td { border: 1px solid ${colors.border}; padding: 8px; }
+                            th { mso-number-format: "\\@"; } /* Mencegah Excel mengubah teks seperti MAR-26 menjadi format Date otomatis */
+                        </style>
+                    </head>
+                    <body>
+                        <h2 style="font-family: sans-serif; color: ${colors.textNormal}; margin-bottom: 10px;">${reportTitle}</h2>
+                        ${tableHTML}
+                    </body>
+                    </html>
+                `;
+            };
+
             const handleExportExcelWithStyle = () => {
-                const table = document.getElementById('dataTable').outerHTML;
-                const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"/><style>table { border-collapse: collapse; font-family: sans-serif; font-size: 13px; } th, td { border: 1px solid ${colors.border}; padding: 8px; }</style></head><body>${table}</body></html>`;
+                const html = generateHTMLString();
                 const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a'); a.href = url; a.download = `Allocation_Unit2_${viewMode}.xls`; a.click(); URL.revokeObjectURL(url);

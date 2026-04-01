@@ -26,6 +26,9 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <!-- SheetJS untuk Export XLSX -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- ExcelJS & FileSaver untuk Export XLSX dengan Warna -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     <style>
         /* Custom Sticky Scrollbar */
         .sticky-col { position: sticky; left: 0; z-index: 20; }
@@ -604,49 +607,143 @@
                 });
             };
 
-            // --- EXPORT EXCEL ---
-            const generateHTMLString = () => {
-                const tableElement = document.getElementById('dataTable');
-                const tableClone = tableElement.cloneNode(true);
-                
-                const ths = tableClone.querySelectorAll('th');
-                ths.forEach(th => {
-                    const text = th.innerText.trim();
-                    if (/^[A-Za-z]{3}-\d{2}$/.test(text)) {
-                        th.style.cssText += '; mso-number-format:"\\@";';
-                        th.innerHTML = '&#8203;' + th.innerHTML; 
-                    }
-                });
-
-                const tableHTML = tableClone.outerHTML;
-                const reportTitle = `Report ${viewMode === 'daily' ? 'Daily' : 'Monthly'} - ${selectedMonth}`;
-                
-                return `
-                    <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-                    <head>
-                        <meta charset="utf-8" />
-                        <style>
-                            table { border-collapse: collapse; font-family: sans-serif; font-size: 13px; }
-                            th, td { border: 1px solid ${colors.border}; padding: 8px; }
-                        </style>
-                    </head>
-                    <body>
-                        <h2 style="font-family: sans-serif; color: ${colors.textNormal}; margin-bottom: 15px;">${reportTitle}</h2>
-                        ${tableHTML}
-                    </body>
-                    </html>
-                `;
-            };
-
+            // --- EXPORT EXCEL (DIPERBAIKI MENGGUNAKAN EXCELJS AGAR BERWARNA) ---
             const handleExportExcelWithStyle = () => {
-                const html = generateHTMLString();
-                const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a'); 
-                a.href = url; 
-                a.download = `Report_HopLun_Unit2_${viewMode}.xls`; 
-                a.click(); 
-                URL.revokeObjectURL(url);
+                const table = document.getElementById('dataTable');
+                if (!table) {
+                    setMessageModal("Tabel tidak ditemukan untuk diekspor.");
+                    return;
+                }
+
+                // Tampilkan notifikasi tunggu saat memproses warna
+                setMessageModal("Sedang mengekspor file Excel dengan warna. Mohon tunggu sebentar...");
+
+                // Dijalankan dengan setTimeout agar browser sempat memunculkan tulisan "Mohon tunggu"
+                setTimeout(async () => {
+                    try {
+                        const workbook = new ExcelJS.Workbook();
+                        const worksheet = workbook.addWorksheet('Report Allocation');
+                        
+                        // Default Properties Row di Excel
+                        worksheet.properties.defaultRowHeight = 25;
+
+                        // Helper untuk mengkonversi RGB/RGBA (dari CSS) ke Hex/ARGB (Format warna khusus Excel)
+                        const rgbToArgb = (rgb) => {
+                            if (!rgb || rgb === 'rgba(0, 0, 0, 0)' || rgb === 'transparent') return 'FFFFFFFF'; // Putih polos
+                            if (rgb.startsWith('#')) {
+                                let hex = rgb.substring(1);
+                                if (hex.length === 3) hex = hex.split('').map(c => c+c).join('');
+                                return 'FF' + hex.toUpperCase();
+                            }
+                            const match = rgb.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*[\d.]+)?\)$/);
+                            if (match) {
+                                const r = parseInt(match[1]).toString(16).padStart(2, '0');
+                                const g = parseInt(match[2]).toString(16).padStart(2, '0');
+                                const b = parseInt(match[3]).toString(16).padStart(2, '0');
+                                return 'FF' + (r + g + b).toUpperCase();
+                            }
+                            return 'FF000000'; // Default hitam
+                        };
+
+                        const rows = table.querySelectorAll('tr');
+                        const skipMap = {};
+                        let rowIndex = 1;
+
+                        // Iterasi membaca baris dan kolom tabel HTML (Smart Parser)
+                        rows.forEach((tr) => {
+                            let colIndex = 1;
+                            const cells = tr.querySelectorAll('th, td');
+
+                            cells.forEach((cell) => {
+                                // Lompat maju jika sel ini sudah "tertempati" karena cell sebelumnya ada rowspan/colspan
+                                while (skipMap[`${rowIndex},${colIndex}`]) { colIndex++; }
+
+                                const rowSpan = parseInt(cell.getAttribute('rowspan')) || 1;
+                                const colSpan = parseInt(cell.getAttribute('colspan')) || 1;
+                                const wsCell = worksheet.getCell(rowIndex, colIndex);
+
+                                // Parsing nilai sel
+                                let text = cell.innerText.trim();
+                                let val = text;
+                                
+                                // Format numerik di Excel (termasuk deteksi angka surplus/minus seperti "+5")
+                                if (!isNaN(text) && text !== '') {
+                                    val = Number(text);
+                                    if (text.startsWith('+')) wsCell.numFmt = '+0;-0;0';
+                                }
+
+                                wsCell.value = val;
+
+                                // Ambil style (warna bg/text) asli yang sedang dirender HTML di browser
+                                const compStyle = window.getComputedStyle(cell);
+                                const bgColor = rgbToArgb(compStyle.backgroundColor);
+                                const fgColor = rgbToArgb(compStyle.color);
+                                const isBold = parseInt(compStyle.fontWeight) >= 600 || compStyle.fontWeight === 'bold' || cell.tagName === 'TH';
+
+                                // Text Alignment
+                                let alignH = 'center';
+                                if (compStyle.textAlign === 'left') alignH = 'left';
+                                else if (compStyle.textAlign === 'right') alignH = 'right';
+
+                                // Terapkan styling ke Cell ExcelJS secara presisi
+                                wsCell.style = {
+                                    font: { color: { argb: fgColor }, bold: isBold, size: 10, name: 'Arial' },
+                                    fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } },
+                                    alignment: { horizontal: alignH, vertical: 'middle', wrapText: true },
+                                    border: {
+                                        top: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+                                        left: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+                                        bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+                                        right: { style: 'thin', color: { argb: 'FFCBD5E1' } }
+                                    }
+                                };
+
+                                // Jika kolom ke-2 ("GRUP"), putar teks berdiri vertikal persis seperti di web
+                                const spanChild = cell.querySelector('span');
+                                if (spanChild && spanChild.style.writingMode === 'vertical-rl') {
+                                    wsCell.alignment.textRotation = 90; 
+                                }
+
+                                // Deteksi manual jika ada garis batas (border) sebelah kanan yang tebal (pembatas per bulan)
+                                if (compStyle.borderRightWidth && parseInt(compStyle.borderRightWidth) > 1) {
+                                    wsCell.border.right = { style: 'medium', color: { argb: 'FF475569' } };
+                                }
+
+                                // Daftarkan blok sel yang "ditimpa" oleh Merged Cells ini
+                                if (rowSpan > 1 || colSpan > 1) {
+                                    worksheet.mergeCells(rowIndex, colIndex, rowIndex + rowSpan - 1, colIndex + colSpan - 1);
+                                    for (let r = 0; r < rowSpan; r++) {
+                                        for (let c = 0; c < colSpan; c++) {
+                                            skipMap[`${rowIndex + r},${colIndex + c}`] = true;
+                                        }
+                                    }
+                                } else {
+                                    skipMap[`${rowIndex},${colIndex}`] = true;
+                                }
+                            });
+                            rowIndex++;
+                        });
+
+                        // Set lebar kolom yang rapi supaya enak dibaca
+                        worksheet.getColumn(1).width = 5;  // NO
+                        worksheet.getColumn(2).width = 6;  // GRUP
+                        worksheet.getColumn(3).width = 30; // EMPLOYEE CATEGORIES
+                        worksheet.getColumn(4).width = 12; // DETAIL
+                        for(let i = 5; i <= worksheet.columnCount; i++) worksheet.getColumn(i).width = 10;
+
+                        // Konversi buffer menjadi File Excel (.xlsx Asli)
+                        const buffer = await workbook.xlsx.writeBuffer();
+                        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+                        window.saveAs(blob, `Report_HopLun_Unit2_${viewMode}_${selectedMonth}.xlsx`);
+
+                        setMessageModal(''); // Tutup modal notifikasi loading
+                        logActivity('EXPORT_EXCEL', `Mengekspor laporan beserta gaya warna ke format XLSX.`);
+
+                    } catch (error) {
+                        console.error("Gagal mengekspor file Excel berwarna:", error);
+                        setMessageModal("Terjadi kesalahan sistem saat mengekspor Excel.");
+                    }
+                }, 100);
             };
 
             const handleExportLogXLSX = () => {
